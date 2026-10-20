@@ -4,17 +4,21 @@
 
 Crear una aplicación personal pequeña para inspeccionar código Fortran desde el navegador y desplegarla en Docker sobre TrueNAS. Priorizar resultados fiables y una primera entrega útil con pocas dependencias.
 
-Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar historial, SQLite. No hay implementación todavía. La estructura prevista es `backend/`, `frontend/`, `tests/` y `docs/`; se crearán cuando tengan contenido real.
+Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar historial, SQLite. La fase 1 ya dispone de motor y consola en `backend/`, pruebas en `tests/` y documentación en `docs/`. `frontend/` se creará en la fase web.
 
 ## 1. Validar el motor
 
-- [ ] Reunir ejemplos representativos con permiso de uso y resultados esperados: formato fijo/libre, comentarios, continuaciones, declaraciones y terminadores.
-- [ ] Evaluar fparser2, documentar compatibilidad, preprocesado, inclusiones y límites. No prometer soporte completo del lenguaje.
-- [ ] Implementar un motor independiente con salida estructurada y una consola mínima: archivos, rutinas, líneas, declaraciones, anidamiento e información de análisis parcial.
-- [ ] Incorporar unas pocas reglas explicables, empezando por las que puedan validarse correctamente por ámbito.
-- [ ] Cubrir regresiones conocidas: `IMPLICIT NONE` con comentario final, cuatro variables en una declaración, identificadores como `shadow` y rutinas terminadas con `END`.
+- [x] Reunir ejemplos representativos con permiso de uso y resultados esperados: formato fijo/libre, comentarios, continuaciones, declaraciones y terminadores.
+- [x] Evaluar fparser2, documentar compatibilidad, preprocesado, inclusiones y límites. No prometer soporte completo del lenguaje.
+- [x] Implementar un motor independiente con salida estructurada y una consola mínima: archivos, rutinas, líneas, declaraciones, anidamiento e información de análisis parcial.
+- [x] Incorporar unas pocas reglas explicables, empezando por las que puedan validarse correctamente por ámbito.
+- [x] Cubrir regresiones conocidas: `IMPLICIT NONE` con comentario final, cuatro variables en una declaración, identificadores como `shadow` y rutinas terminadas con `END`.
 
 **Aceptación:** analizar un proyecto representativo desde consola, contrastar sus resultados y señalar explícitamente los archivos o construcciones que no se puedan interpretar.
+
+**Resultado (2026-10-20):** implementado y contrastado con un proyecto sintético propio de formato fijo/libre. El corpus tiene expectativas explícitas y las pruebas cubren también resultados parciales y fallidos. fparser2 0.2.5 se adopta provisionalmente; ver [evaluación](PARSER.md). Pendiente validación adicional con modelos científicos reales aportados por sus propietarios. El siguiente paso de implementación es la fase 2, reutilizando el contrato de resultados existente.
+
+**Verificación de esta entrega:** 34 pruebas pasan en Python 3.11 y 3.12 sobre Windows; Ruff comprueba estilo y formato. Se construyen wheel y distribución fuente y se comprueba que excluyen la referencia Java y los datos locales. La consola analiza el proyecto de ejemplo: 2 archivos completos y 1 aviso FA001 esperado. La validación en Linux/Docker y TrueNAS sigue perteneciendo a la fase 3.
 
 ## 2. Entregar una web mínima
 
