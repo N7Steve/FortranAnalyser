@@ -1,0 +1,44 @@
+# Pegar en Apps > Discover Apps > Install via YAML (TrueNAS con Docker Compose).
+# Requiere que las fases 2 y 3 estén publicadas en main.
+# Sin rutas del equipo de desarrollo ni archivos .env externos.
+services:
+  fortran-analyser:
+    build:
+      context: https://github.com/N7Steve/FortranAnalyser.git#main
+      dockerfile: Dockerfile
+    pull_policy: build
+    init: true
+    restart: unless-stopped
+    ports:
+      - "8890:8000" # Acceso: http://IP_DEL_TRUENAS:8890
+    environment:
+      FORTRAN_ALLOWED_HOSTS: "*" # Opcional: IP y/o DNS del NAS, separados por comas.
+      FORTRAN_DATA_DIR: /data
+    volumes:
+      - analyses:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 2
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Para usar un dataset propio, sustituir analyses:/data por:
+# - type: bind
+#   source: /mnt/TU_POOL/apps/fortran-analyser
+#   target: /data
+#   bind:
+#     create_host_path: false
+# Crear antes el dataset y conceder escritura a UID/GID 568:568.
+volumes:
+  analyses:

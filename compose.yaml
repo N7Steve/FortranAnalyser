@@ -1,0 +1,33 @@
+services:
+  fortran-analyser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${FORTRAN_HOST_PORT:-8890}:8000"
+    environment:
+      FORTRAN_ALLOWED_HOSTS: "${FORTRAN_ALLOWED_HOSTS:-*}"
+      FORTRAN_DATA_DIR: /data
+    volumes:
+      - analyses:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 2
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  analyses:

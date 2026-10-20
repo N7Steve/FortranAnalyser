@@ -3,6 +3,7 @@
 import math
 import multiprocessing
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from fparser import __version__ as parser_version
@@ -85,6 +86,8 @@ def analyse_project(
     max_file_bytes: int = 2_000_000,
     max_files: int = 500,
     timeout: float = 10,
+    on_progress: Callable[[int, int], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> ProjectResult:
     """Analyse files sequentially in fresh processes. No project code is run.
 
@@ -103,9 +106,13 @@ def analyse_project(
             raise ValueError(f"El proyecto supera el límite de {max_files} archivos Fortran.")
     if not paths:
         raise ValueError("No se encontraron archivos Fortran compatibles.")
+    if on_progress:
+        on_progress(0, len(paths))
     base = root if root.is_dir() else root.parent
     results = []
     for path in paths:
+        if should_cancel and should_cancel():
+            raise ValueError("Análisis cancelado.")
         relative = path.relative_to(base).as_posix()
         form = (
             source_form
@@ -144,6 +151,10 @@ def analyse_project(
             results.append(_failure(relative, form, "FA107", f"No se pudo leer como UTF-8: {exc}"))
             continue
         results.append(_bounded_analysis(source, relative, form, timeout))
+        if on_progress:
+            on_progress(len(results), len(paths))
+    if on_progress:
+        on_progress(len(results), len(paths))
     summary = {
         status: sum(r.status == status for r in results)
         for status in (

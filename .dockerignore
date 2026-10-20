@@ -15,3 +15,9 @@ reference
 data
 uploads
 reports
+**/dist
+**/build
+**/coverage
+**/*.tsbuildinfo
+**/.idea
+**/.vscode

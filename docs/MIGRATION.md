@@ -4,7 +4,7 @@
 
 Crear una aplicación personal pequeña para inspeccionar código Fortran desde el navegador y desplegarla en Docker sobre TrueNAS. Priorizar resultados fiables y una primera entrega útil con pocas dependencias.
 
-Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar historial, SQLite. La fase 1 ya dispone de motor y consola en `backend/`, pruebas en `tests/` y documentación en `docs/`. `frontend/` se creará en la fase web.
+Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar historial, SQLite. `backend/` contiene motor, consola y API; `frontend/` contiene la interfaz React. Las pruebas están en `tests/` y la documentación en `docs/`.
 
 ## 1. Validar el motor
 
@@ -22,22 +22,31 @@ Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar histori
 
 ## 2. Entregar una web mínima
 
-- [ ] Exponer el mismo motor mediante FastAPI, con estado y errores de cada análisis y ejecución de trabajo fuera del bucle de atención de peticiones.
-- [ ] Cargar un ZIP con límites de tamaño y extracción segura, sin ejecutar código ni scripts del proyecto.
-- [ ] Mostrar resumen, árbol de archivos, métricas y hallazgos sobre un visor de código, con filtros básicos.
-- [ ] Exportar resultados JSON. Aplazar el PDF y la personalización visual avanzada.
-- [ ] Documentar instalación y verificar el recorrido completo con un ejemplo pequeño.
+- [x] Exponer el mismo motor mediante FastAPI, con estado y errores de cada análisis y ejecución de trabajo fuera del bucle de atención de peticiones.
+- [x] Cargar un ZIP con límites de tamaño y extracción segura, sin ejecutar código ni scripts del proyecto.
+- [x] Mostrar resumen, árbol de archivos, métricas y hallazgos sobre un visor de código, con filtros básicos.
+- [x] Exportar resultados JSON. Aplazar el PDF y la personalización visual avanzada.
+- [x] Documentar instalación y verificar el recorrido completo con un ejemplo pequeño.
 
 **Aceptación:** subir un proyecto desde el navegador, consultar resultados localizados en el código y descargar el análisis sin bloquear la interfaz.
 
+**Resultado (2026-10-20):** web React/TypeScript y API FastAPI implementadas. Cola acotada con cancelación, ZIP limitado y fuentes temporales; resumen, árbol, filtros, ámbitos, visor paginado y exportación del contrato JSON original. La aplicación puede servir la web compilada desde el mismo proceso HTTP; ver [arranque y límites](WEB.md). Se conserva explícitamente la distinción entre resultados completos, parciales y fallidos. No hay historial ni autenticación multiusuario. El siguiente paso es la fase 3 de Docker y TrueNAS.
+
+**Verificación de esta entrega:** 63 pruebas pasan en Python 3.11 y 3.12 sobre Windows, incluida una prueba HTTP real durante un análisis. Ruff, formato del frontend, instalación reproducible con `npm ci`, TypeScript y construcción de Vite pasan. En navegador se han probado el ejemplo, la selección de un ZIP local, resultados, salto al código, filtro de gravedad, descarga JSON y recuperación tras recarga. Se construyen los paquetes Python y se comprueban sus exclusiones. El despliegue en Linux/TrueNAS todavía no se ha validado.
+
 ## 3. Desplegar en Docker y TrueNAS
 
-- [ ] Construir una imagen que incluya la web y la API, con proceso de análisis separado cuando corresponda y sin necesidad de escritorio gráfico.
-- [ ] Proporcionar Docker Compose, comprobación de salud, usuario sin privilegios y volúmenes para datos persistentes y trabajo temporal.
-- [ ] Documentar puerto, permisos, configuración, límites de recursos, limpieza y actualización. Excluir siempre `reference/`, secretos y datos locales de la imagen.
-- [ ] Comprobar arranque, análisis y conservación de resultados tras recrear el contenedor; validar con la edición y versión reales de TrueNAS.
+- [x] Construir una imagen que incluya la web y la API, con proceso de análisis separado cuando corresponda y sin necesidad de escritorio gráfico.
+- [x] Proporcionar Docker Compose, comprobación de salud, usuario sin privilegios y volúmenes para datos persistentes y trabajo temporal.
+- [x] Documentar puerto, permisos, configuración, límites de recursos, limpieza y actualización. Excluir siempre `reference/`, secretos y datos locales de la imagen.
+- [x] Comprobar arranque, análisis y conservación de resultados tras recrear el contenedor.
+- [ ] Validar la instalación con la edición y versión reales de TrueNAS, cuando se disponga de ese entorno.
 
 **Aceptación:** instalar siguiendo la documentación y analizar un proyecto desde otro equipo de la red.
+
+**Resultado (2026-10-20):** imagen completa construida y probada en Docker Linux/amd64. El Compose local expone el puerto 8890; `deploy/truenas.yaml` permite construir desde el repositorio Git público. La imagen usa UID/GID 568:568, raíz de solo lectura, comprobación de salud y almacenamiento persistente. Se conservan fuentes e informes mediante registros JSON atómicos, sin incorporar todavía un historial visual ni comparaciones.
+
+**Verificación:** 68 pruebas pasan tanto en Windows como dentro de la etapa Linux de Docker. Ambos YAML pasan `docker compose config`. Una prueba automática del contenedor valida recursos web, API, ejemplo, descarga, usuario no privilegiado, ausencia de Node/uv en ejecución y conservación del mismo informe y fuente después de recrear el contenedor. Las instrucciones están en [DEPLOYMENT.md](DEPLOYMENT.md). La instalación en el NAS real y el acceso desde otro equipo siguen pendientes; no se ha afirmado validación en TrueNAS.
 
 ## Después de la primera versión útil
 

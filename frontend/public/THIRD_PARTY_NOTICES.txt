@@ -1,0 +1,10 @@
+FortranAnalyser web interface includes:
+
+- React and React DOM: MIT license. See licenses/react.txt and licenses/react-dom.txt.
+- Lucide icons: ISC license, with MIT notices for Feather-derived icons. See licenses/lucide-react.txt.
+- highlight.js: BSD-3-Clause license. See licenses/highlight-js.txt.
+- DM Sans and Manrope fonts: SIL Open Font License 1.1. See licenses/dm-sans.txt and licenses/manrope.txt.
+
+The notices above are copied from the installed dependency packages. Package versions
+are recorded in frontend/package-lock.json. Keep these notices when distributing
+the built web application, and refresh them when dependency licenses change.
