@@ -1,0 +1,41 @@
+# Copia íntegra del proyecto original: solo referencia local
+/reference/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Frontend y compilados
+node_modules/
+dist/
+build/
+coverage/
+
+# Datos y configuración locales
+.env
+.env.*
+!.env.example
+/data/
+/uploads/
+/reports/
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+
+# Editores y sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
