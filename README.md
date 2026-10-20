@@ -6,7 +6,7 @@ El objetivo es explorar proyectos Fortran desde una interfaz web: consultar mét
 
 ## Dirección técnica
 
-- **Motor:** Python, con un parser existente de Fortran; fparser2 es el primer candidato que se validará con ejemplos reales.
+- **Motor:** Python, con fparser2 para interpretar la estructura sintáctica de Fortran.
 - **API:** FastAPI, separada del motor para permitir también su uso desde consola.
 - **Frontend:** React y TypeScript.
 - **Persistencia:** SQLite cuando se incorpore el historial.
@@ -22,7 +22,7 @@ El [plan de migración](docs/MIGRATION.md) recoge el progreso. Los acuerdos de t
 
 **Docker / TrueNAS:** consultar [despliegue](docs/DEPLOYMENT.md). `docker compose up -d --build --wait` construye la copia local y expone la web en `http://localhost:8890/`. [deploy/truenas.yaml](deploy/truenas.yaml) está preparado para pegar en TrueNAS y construir desde `main`.
 
-**Web:** seguir las [instrucciones de arranque local](docs/WEB.md). Incluye un proyecto de ejemplo, explorador de fuentes, filtros y descarga JSON. Los resultados son temporales durante esta fase.
+**Web:** seguir las [instrucciones de arranque local](docs/WEB.md). Incluye un proyecto de ejemplo, explorador visual, filtros, descarga JSON, temas claro/oscuro y una sección sobre la migración. Docker conserva los resultados en su volumen; el arranque local sin configuración de persistencia usa datos temporales.
 
 **Consola:**
 

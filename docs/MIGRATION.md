@@ -48,6 +48,28 @@ Elección inicial: Python + FastAPI, React + TypeScript y, al incorporar histori
 
 **Verificación:** 68 pruebas pasan tanto en Windows como dentro de la etapa Linux de Docker. Ambos YAML pasan `docker compose config`. Una prueba automática del contenedor valida recursos web, API, ejemplo, descarga, usuario no privilegiado, ausencia de Node/uv en ejecución y conservación del mismo informe y fuente después de recrear el contenedor. Las instrucciones están en [DEPLOYMENT.md](DEPLOYMENT.md). La instalación en el NAS real y el acceso desde otro equipo siguen pendientes; no se ha afirmado validación en TrueNAS.
 
+## Revisión visual (2026-10-20)
+
+- [x] Unificar tipografía DM Sans, aumentar tamaños de lectura y renovar colores, tarjetas y espaciados.
+- [x] Gráfico circular de estados y barras de gravedad que filtran los hallazgos.
+- [x] Mapa interactivo de archivos con comparación por líneas o hallazgos, selección y leyenda de estados.
+- [x] Mapa de posición y extensión de rutinas con navegación al código, sin inferir dependencias ni rendimiento.
+
+Los mapas usan exclusivamente los datos del informe. La vista compacta muestra hasta 18 rutinas; la pestaña de ámbitos conserva la lista completa. Los archivos sin métricas muestran su limitación. Los gráficos se construyen con HTML/CSS, sin servicios externos ni dependencias nuevas.
+
+**Verificación:** TypeScript y construcción de producción correctos; formato del frontend validado. Imagen Docker reconstruida y saludable en el puerto 8890. Comprobadas en navegador la selección de archivo, el cambio de métrica, el filtro por gravedad y el salto de rutina a su línea resaltada. Vista móvil comprobada a 390 px sin desbordamiento horizontal.
+
+## Apariencia y documentación dentro de la web (2026-10-20)
+
+- [x] Aumentar textos auxiliares, etiquetas, cifras pequeñas y lectura del código.
+- [x] Incorporar animaciones de entrada y transiciones con respeto al movimiento reducido.
+- [x] Ajustes de estilo Original/Moderno y Claro/Oscuro, con persistencia local y navegación por teclado.
+- [x] Añadir la sección «La migración»: origen, comparación técnica, casos corregidos y funciones aún no migradas.
+
+La paleta Original se contrasta con `MainWindow.java` (azul 61, 143, 199 y paneles grises). Las explicaciones sobre comentarios y declaraciones se contrastan con `TasksBar.java`, el proyecto Maven original y las regresiones del motor. Se conserva la atribución a Michael García Rodríguez y la licencia del proyecto. Uso y comportamiento documentados en [WEB.md](WEB.md).
+
+**Verificación de apariencia:** las cuatro combinaciones se comprueban en navegador, incluyendo guardado tras recarga, cierre con Escape y retorno del foco. Explorador y sección de migración comprobados con datos reales del ejemplo; vista móvil a 390 px sin desbordamiento de página y ajustes accesibles. TypeScript, construcción Vite, Prettier, Ruff y las 68 pruebas Python pasan. Docker reconstruido y saludable en 8890.
+
 ## Después de la primera versión útil
 
 - [ ] Persistencia con SQLite, historial y comparación entre análisis con la misma versión de reglas.

@@ -29,7 +29,10 @@ export default function CodeViewer({ id, path, line }: { id: string; path: strin
     setPage(Math.floor(Math.max(0, line - 1) / PAGE_SIZE))
   }, [path, line])
   useEffect(() => {
-    selected.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    selected.current?.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    })
   }, [source, page, line])
   const lines = useMemo(() => {
     if (!source) return []

@@ -18,6 +18,7 @@ import {
   Folder,
   FolderOpen,
   LayoutDashboard,
+  History,
   LoaderCircle,
   Plus,
   Search,
@@ -28,6 +29,9 @@ import {
 } from 'lucide-react'
 import { apiUrl, ApiError, request } from './api'
 import CodeViewer from './CodeViewer'
+import SettingsMenu from './SettingsMenu'
+import MigrationPage from './MigrationPage'
+import { ProjectMap, ScopeMap, StatusRing, FindingsChart } from './DesignCharts'
 import type { FileStatus, Finding, Job, Report, SourceFile } from './types'
 
 const STATUS: Record<FileStatus, string> = {
@@ -142,7 +146,7 @@ function FindingRow({ finding, onClick }: { finding: Finding; onClick: () => voi
 export default function App() {
   const [job, setJob] = useState<Job | null>(null)
   const [report, setReport] = useState<Report | null>(null)
-  const [tab, setTab] = useState<'overview' | 'explorer'>('overview')
+  const [tab, setTab] = useState<'overview' | 'explorer' | 'migration'>('overview')
   const [selected, setSelected] = useState<SourceFile | null>(null)
   const [line, setLine] = useState(0)
   const [search, setSearch] = useState('')
@@ -155,6 +159,10 @@ export default function App() {
   const [form, setForm] = useState('auto')
   const [persistent, setPersistent] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [tab])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -328,6 +336,14 @@ export default function App() {
             <FolderOpen size={18} />
             Explorador{report && <span className="nav-count">{report.summary.files}</span>}
           </button>
+          <button
+            className={tab === 'migration' ? 'active' : ''}
+            onClick={() => setTab('migration')}
+            title="La migración"
+          >
+            <History size={18} />
+            La migración
+          </button>
         </nav>
         <div className="sidebar-note">
           <div className="orbital">
@@ -349,530 +365,570 @@ export default function App() {
       <div className="main-shell">
         <header className="topbar">
           <span>
-            Workspace <ChevronRight size={14} />{' '}
-            <b>{tab === 'overview' ? 'Resumen del proyecto' : 'Explorador de código'}</b>
+            Proyecto <ChevronRight size={14} />{' '}
+            <b>
+              {tab === 'migration'
+                ? 'La migración'
+                : tab === 'overview'
+                  ? 'Resumen del proyecto'
+                  : 'Explorador de código'}
+            </b>
           </span>
-          <span className="private-label">
-            <ShieldCheck size={15} /> Tu código se queda aquí
-          </span>
+          <div className="topbar-actions">
+            <span className="private-label">
+              <ShieldCheck size={15} /> Tu código se queda aquí
+            </span>
+            <SettingsMenu />
+          </div>
         </header>
         <main>
-          <div className="page-heading">
-            <div>
-              <div className="eyebrow">ANÁLISIS ESTÁTICO DE FORTRAN</div>
-              <h1>{report ? job?.name : 'Una nueva mirada a tu código.'}</h1>
-              <p>
-                {report
-                  ? `${number(lines)} líneas · ${report.summary.files} archivos · ${report.parser}`
-                  : 'De código heredado a decisiones claras. Explora, comprende y mejora.'}
-              </p>
-            </div>
-            {report && (
-              <div className="heading-actions">
-                <a
-                  className="button secondary"
-                  href={apiUrl(`/api/analyses/${job?.id}/report?download=true`)}
-                >
-                  <ArrowDownToLine size={16} />
-                  Exportar JSON
-                </a>
-                <button
-                  className="button primary"
-                  disabled={!!running}
-                  onClick={() => input.current?.click()}
-                >
-                  <Plus size={17} />
-                  Nuevo análisis
-                </button>
-              </div>
-            )}
-          </div>
-          <input
-            ref={input}
-            className="visually-hidden"
-            type="file"
-            accept=".zip,application/zip"
-            aria-label="Seleccionar proyecto ZIP"
-            onChange={(e: ChangeEvent<HTMLInputElement>) => choose(e.target.files?.[0])}
-          />
-          {error && (
-            <div className="error-banner" role="alert">
-              <CircleAlert size={18} />
-              <span>{error}</span>
-              <button aria-label="Cerrar error" onClick={() => setError('')}>
-                <X size={16} />
-              </button>
-            </div>
-          )}
-
-          {!report && !running && (
-            <>
-              <section className="welcome-card">
-                <div className="welcome-content">
-                  <span className="pill">
-                    <span />
-                    Una herramienta para entender
-                  </span>
-                  <h2>
-                    Tu proyecto.
-                    <br />
-                    Una visión más clara.
-                  </h2>
+          {tab === 'migration' ? (
+            <MigrationPage />
+          ) : (
+            <div className="analysis-view" key={tab}>
+              <div className="page-heading">
+                <div>
+                  <div className="eyebrow">ANÁLISIS ESTÁTICO DE FORTRAN</div>
+                  <h1>{report ? job?.name : 'Una nueva mirada a tu código.'}</h1>
                   <p>
-                    Descubre cómo se organiza tu código Fortran y qué merece una segunda mirada, con
-                    hallazgos que puedes comprobar.
+                    {report
+                      ? `${number(lines)} líneas · ${report.summary.files} archivos · ${report.parser}`
+                      : 'De código heredado a decisiones claras. Explora, comprende y mejora.'}
                   </p>
-                  <div className="feature-pills">
-                    <span>
-                      <Check size={14} />
-                      Métricas por rutina
-                    </span>
-                    <span>
-                      <Check size={14} />
-                      Hallazgos con contexto
-                    </span>
-                  </div>
-                  <button className="text-button" onClick={demo}>
-                    Explorar un ejemplo <ArrowRight size={16} />
-                  </button>
                 </div>
-                <div
-                  className={`upload-zone ${drag ? 'dragging' : ''}`}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setDrag(true)
-                  }}
-                  onDragLeave={() => setDrag(false)}
-                  onDrop={drop}
-                >
-                  <span className="upload-icon">
-                    <Upload size={27} />
-                  </span>
-                  <h3>Empieza con tu proyecto</h3>
-                  <p>
-                    Arrastra un archivo ZIP aquí
-                    <br />o selecciónalo en tu equipo.
-                  </p>
-                  <button className="button primary" onClick={() => input.current?.click()}>
-                    <Plus size={16} />
-                    Seleccionar ZIP
-                  </button>
-                  <label className="form-select">
-                    Formato de código
-                    <select
-                      aria-label="Formato del código"
-                      value={form}
-                      onChange={(event) => setForm(event.target.value)}
+                {report && (
+                  <div className="heading-actions">
+                    <a
+                      className="button secondary"
+                      href={apiUrl(`/api/analyses/${job?.id}/report?download=true`)}
                     >
-                      <option value="auto">Automático por extensión</option>
-                      <option value="free">Formato libre</option>
-                      <option value="fixed">Formato fijo</option>
-                    </select>
-                    <ChevronDown size={13} />
-                  </label>
-                  <small>Hasta 10 MB · 100 archivos Fortran</small>
+                      <ArrowDownToLine size={16} />
+                      Exportar JSON
+                    </a>
+                    <button
+                      className="button primary"
+                      disabled={!!running}
+                      onClick={() => input.current?.click()}
+                    >
+                      <Plus size={17} />
+                      Nuevo análisis
+                    </button>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={input}
+                className="visually-hidden"
+                type="file"
+                accept=".zip,application/zip"
+                aria-label="Seleccionar proyecto ZIP"
+                onChange={(e: ChangeEvent<HTMLInputElement>) => choose(e.target.files?.[0])}
+              />
+              {error && (
+                <div className="error-banner" role="alert">
+                  <CircleAlert size={18} />
+                  <span>{error}</span>
+                  <button aria-label="Cerrar error" onClick={() => setError('')}>
+                    <X size={16} />
+                  </button>
                 </div>
-              </section>
-              <div className="intro-grid">
-                <article>
-                  <span className="intro-icon">
-                    <Files size={21} />
-                  </span>
-                  <h3>Conoce la estructura</h3>
-                  <p>Archivos, módulos y rutinas. Un mapa de lo que tienes entre manos.</p>
-                </article>
-                <article>
-                  <span className="intro-icon">
-                    <CircleAlert size={21} />
-                  </span>
-                  <h3>Revisa con criterio</h3>
-                  <p>Observaciones explicadas sobre el código, sin notas de calidad arbitrarias.</p>
-                </article>
-                <article>
-                  <span className="intro-icon">
-                    <Code2 size={21} />
-                  </span>
-                  <h3>Ve al origen</h3>
-                  <p>Abre cada hallazgo justo en la línea que necesita tu atención.</p>
-                </article>
-              </div>
-            </>
-          )}
-
-          {running && (
-            <section className="processing" role="status">
-              <div className="processing-icon">
-                <LoaderCircle size={32} className="spin" />
-              </div>
-              <span className="eyebrow">UN MOMENTO, ESTAMOS EXPLORANDO</span>
-              <h2>{busy ? 'Preparando tu proyecto' : JOB_STATUS[job!.status]}</h2>
-              <p>
-                {job?.total
-                  ? `${job.processed} de ${job.total} archivos procesados`
-                  : 'Leemos la estructura del proyecto sin ejecutar tu código.'}
-              </p>
-              <progress max={job?.total || 1} value={job?.processed || 0} />
-              <small>Puedes seguir utilizando la interfaz mientras se analiza.</small>
-              {job && (
-                <button
-                  className="button secondary"
-                  onClick={() => {
-                    void request(`/api/analyses/${job.id}`, { method: 'DELETE' }).catch((e) =>
-                      setError(e.message),
-                    )
-                  }}
-                >
-                  Cancelar análisis
-                </button>
               )}
-            </section>
-          )}
-          {!running && job?.status === 'failed' && (
-            <div className="error-banner" role="alert">
-              <CircleAlert size={18} />
-              {job.error}
-            </div>
-          )}
-          {!running && job?.status === 'cancelled' && (
-            <div className="notice">Análisis cancelado. Puedes seleccionar otro proyecto.</div>
-          )}
 
-          {report && !running && (
-            <>
-              <section className="stats-grid">
-                <article className="stat-card">
-                  <div>
-                    <span>Archivos del proyecto</span>
-                    <Files size={18} />
-                  </div>
-                  <strong>{number(report.summary.files)}</strong>
-                  <small>{number(lines)} líneas de código fuente</small>
-                </article>
-                <article className="stat-card">
-                  <div>
-                    <span>Rutinas identificadas</span>
-                    <Braces size={18} />
-                  </div>
-                  <strong>{number(routines)}</strong>
-                  <small>Funciones y subrutinas interpretadas</small>
-                </article>
-                <article className="stat-card">
-                  <div>
-                    <span>Hallazgos para revisar</span>
-                    <CircleAlert size={18} />
-                  </div>
-                  <strong>
-                    {findings.length}
-                    <i className="stat-tag">
-                      {findings.filter((f) => f.severity === 'error').length
-                        ? 'Con errores'
-                        : 'Con contexto'}
-                    </i>
-                  </strong>
-                  <small>
-                    {findings.filter((f) => f.severity === 'warning').length} avisos ·{' '}
-                    {findings.filter((f) => f.severity === 'info').length} observaciones
-                  </small>
-                </article>
-                <article className="stat-card">
-                  <div>
-                    <span>Cobertura del análisis</span>
-                    <CheckCheck size={18} />
-                  </div>
-                  <strong>
-                    {coverage}
-                    <em>%</em>
-                  </strong>
-                  <small>
-                    {report.summary.ok} de {report.summary.files} archivos completos
-                  </small>
-                </article>
-              </section>
-              <div className="content-tabs">
-                <button
-                  className={tab === 'overview' ? 'selected' : ''}
-                  onClick={() => setTab('overview')}
-                >
-                  <LayoutDashboard size={16} />
-                  Resumen
-                </button>
-                <button
-                  className={tab === 'explorer' ? 'selected' : ''}
-                  onClick={() => setTab('explorer')}
-                >
-                  <Code2 size={16} />
-                  Explorador de código
-                </button>
-                <span>
-                  <span className="status-dot ok" />
-                  Análisis terminado
-                </span>
-              </div>
-              {tab === 'overview' ? (
+              {!report && !running && (
                 <>
-                  <div className="overview-grid">
-                    <section className="panel">
-                      <div className="panel-heading">
-                        <div>
-                          <h2>Dentro del proyecto</h2>
-                          <p>Los archivos con más líneas de código fuente</p>
-                        </div>
-                        <span className="subtle-icon">
-                          <Activity size={19} />
+                  <section className="welcome-card">
+                    <div className="welcome-content">
+                      <span className="pill">
+                        <span />
+                        Una herramienta para entender
+                      </span>
+                      <h2>
+                        Tu proyecto.
+                        <br />
+                        Una visión más clara.
+                      </h2>
+                      <p>
+                        Descubre cómo se organiza tu código Fortran y qué merece una segunda mirada,
+                        con hallazgos que puedes comprobar.
+                      </p>
+                      <div className="feature-pills">
+                        <span>
+                          <Check size={14} />
+                          Métricas por rutina
+                        </span>
+                        <span>
+                          <Check size={14} />
+                          Hallazgos con contexto
                         </span>
                       </div>
-                      <div className="file-chart">
-                        {chartFiles.map((file) => (
-                          <button key={file.path} onClick={() => open(file)}>
-                            <span title={file.path}>
-                              <FileCode2 size={15} />
-                              {file.path.split('/').pop()}
-                            </span>
-                            <div className="bar-track">
-                              <i
-                                style={{
-                                  width: `${((file.physical_lines ?? 0) / maxLines) * 100}%`,
-                                }}
-                              />
-                            </div>
-                            <b>{number(file.physical_lines ?? 0)}</b>
-                          </button>
-                        ))}
-                      </div>
-                      <button className="panel-link" onClick={() => setTab('explorer')}>
-                        Explorar todos los archivos <ArrowRight size={15} />
+                      <button className="text-button" onClick={demo}>
+                        Explorar un ejemplo <ArrowRight size={16} />
                       </button>
-                    </section>
-                    <section className="panel coverage-panel">
-                      <div className="panel-heading">
-                        <div>
-                          <h2>Una lectura transparente</h2>
-                          <p>Qué hemos podido interpretar</p>
-                        </div>
-                      </div>
-                      <div className="coverage-number">
-                        {coverage}
-                        <span>%</span>
-                        <small>del proyecto analizado completamente</small>
-                      </div>
-                      <div className="coverage-track">
-                        {(['ok', 'partial', 'failed', 'skipped'] as FileStatus[]).map((status) => (
-                          <i
-                            key={status}
-                            className={status}
-                            style={{
-                              width: `${(report.summary[status] / report.summary.files) * 100}%`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <div className="coverage-legend">
-                        {(['ok', 'partial', 'failed', 'skipped'] as FileStatus[]).map((status) => (
-                          <span key={status}>
-                            <i className={`status-dot ${status}`} />
-                            {STATUS[status]}
-                            <b>{report.summary[status]}</b>
-                          </span>
-                        ))}
-                      </div>
-                      {coverage < 100 && (
-                        <p className="coverage-note">
-                          Los archivos parciales o fallidos no aportan métricas de rutinas. Sus
-                          límites están en los hallazgos.
-                        </p>
-                      )}
-                    </section>
-                  </div>
-                  <section className="panel findings-panel">
-                    <div className="panel-heading">
-                      <div>
-                        <h2>
-                          El siguiente paso está en los detalles{' '}
-                          <span className="count-label">{findings.length}</span>
-                        </h2>
-                        <p>Observaciones para investigar, con su ubicación en el código</p>
-                      </div>
-                      <select
-                        aria-label="Filtrar gravedad"
-                        value={severity}
-                        onChange={(event) => setSeverity(event.target.value)}
-                      >
-                        <option value="all">Todas las gravedades</option>
-                        <option value="warning">Avisos</option>
-                        <option value="info">Observaciones</option>
-                        <option value="error">Errores</option>
-                      </select>
                     </div>
-                    {visibleFindings.length ? (
-                      visibleFindings.map((finding, index) => (
-                        <FindingRow
-                          key={index}
-                          finding={finding}
-                          onClick={() => openFinding(finding)}
-                        />
-                      ))
-                    ) : (
-                      <div className="no-findings">
-                        <CheckCheck size={23} />
-                        <b>
-                          {findings.length
-                            ? 'Sin hallazgos con este filtro'
-                            : 'Sin hallazgos en las reglas actuales'}
-                        </b>
-                        <p>
-                          El análisis es sintáctico. Esto no valida la corrección científica del
-                          modelo.
-                        </p>
-                      </div>
-                    )}
-                  </section>
-                </>
-              ) : (
-                <div className="explorer-layout">
-                  <section className="panel file-browser">
-                    <div className="panel-heading">
-                      <h2>
-                        Archivos <span className="count-label">{filteredFiles.length}</span>
-                      </h2>
-                    </div>
-                    <label className="search-box">
-                      <Search size={15} />
-                      <input
-                        aria-label="Buscar archivos"
-                        placeholder="Buscar archivo…"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </label>
-                    <select
-                      className="file-filter"
-                      aria-label="Filtrar estado"
-                      value={filter}
-                      onChange={(event) => setFilter(event.target.value)}
+                    <div
+                      className={`upload-zone ${drag ? 'dragging' : ''}`}
+                      onDragOver={(event) => {
+                        event.preventDefault()
+                        setDrag(true)
+                      }}
+                      onDragLeave={() => setDrag(false)}
+                      onDrop={drop}
                     >
-                      <option value="all">Todos los estados</option>
-                      {Object.entries(STATUS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="file-tree">
-                      <FileTree
-                        files={filteredFiles}
-                        selected={selected?.path ?? ''}
-                        onSelect={(file) => open(file)}
-                      />
-                      {!filteredFiles.length && (
-                        <p className="muted">Sin archivos con este filtro.</p>
-                      )}
+                      <span className="upload-icon">
+                        <Upload size={27} />
+                      </span>
+                      <h3>Empieza con tu proyecto</h3>
+                      <p>
+                        Arrastra un archivo ZIP aquí
+                        <br />o selecciónalo en tu equipo.
+                      </p>
+                      <button className="button primary" onClick={() => input.current?.click()}>
+                        <Plus size={16} />
+                        Seleccionar ZIP
+                      </button>
+                      <label className="form-select">
+                        Formato de código
+                        <select
+                          aria-label="Formato del código"
+                          value={form}
+                          onChange={(event) => setForm(event.target.value)}
+                        >
+                          <option value="auto">Automático por extensión</option>
+                          <option value="free">Formato libre</option>
+                          <option value="fixed">Formato fijo</option>
+                        </select>
+                        <ChevronDown size={13} />
+                      </label>
+                      <small>Hasta 10 MB · 100 archivos Fortran</small>
                     </div>
                   </section>
-                  <div className="file-detail">
-                    {selected && job ? (
-                      <>
-                        <div className="file-detail-heading">
-                          <span>
-                            <FileCode2 size={18} />
-                            <b>{selected.path}</b>
-                          </span>
-                          <Badge status={selected.status} />
-                        </div>
-                        <div className="file-mini-stats">
-                          <span>
-                            <b>{selected.physical_lines ?? '—'}</b> líneas
-                          </span>
-                          <span>
-                            <b>{selected.metrics?.declared_entities ?? '—'}</b> entidades declaradas
-                          </span>
-                          <span>
-                            <b>{selected.metrics?.max_loop_depth ?? '—'}</b> profundidad de bucles
-                          </span>
-                          <span>
-                            {selected.source_form === 'free' ? 'Formato libre' : 'Formato fijo'}
-                          </span>
-                        </div>
-                        <div className="detail-tabs">
-                          <button
-                            className={!scopeTab ? 'selected' : ''}
-                            onClick={() => setScopeTab(false)}
-                          >
-                            Código fuente
-                          </button>
-                          <button
-                            className={scopeTab ? 'selected' : ''}
-                            onClick={() => setScopeTab(true)}
-                          >
-                            Ámbitos y rutinas <span>{selected.scopes.length}</span>
-                          </button>
-                        </div>
-                        {!scopeTab ? (
-                          <CodeViewer id={job.id} path={selected.path} line={line} />
-                        ) : (
-                          <div className="scopes-panel">
-                            {selected.scopes.map((scope) => (
-                              <button
-                                key={`${scope.line}-${scope.qualified_name}`}
-                                onClick={() => {
-                                  setLine(scope.line)
-                                  setScopeTab(false)
-                                }}
-                              >
-                                <span>
-                                  <Braces size={17} />
-                                  <b>{scope.qualified_name}</b>
-                                  <small>
-                                    {scope.kind} · líneas {scope.line}–{scope.end_line}
-                                  </small>
+                  <div className="intro-grid">
+                    <article>
+                      <span className="intro-icon">
+                        <Files size={21} />
+                      </span>
+                      <h3>Conoce la estructura</h3>
+                      <p>Archivos, módulos y rutinas. Un mapa de lo que tienes entre manos.</p>
+                    </article>
+                    <article>
+                      <span className="intro-icon">
+                        <CircleAlert size={21} />
+                      </span>
+                      <h3>Revisa con criterio</h3>
+                      <p>
+                        Observaciones explicadas sobre el código, sin notas de calidad arbitrarias.
+                      </p>
+                    </article>
+                    <article>
+                      <span className="intro-icon">
+                        <Code2 size={21} />
+                      </span>
+                      <h3>Ve al origen</h3>
+                      <p>Abre cada hallazgo justo en la línea que necesita tu atención.</p>
+                    </article>
+                  </div>
+                </>
+              )}
+
+              {running && (
+                <section className="processing" role="status">
+                  <div className="processing-icon">
+                    <LoaderCircle size={32} className="spin" />
+                  </div>
+                  <span className="eyebrow">UN MOMENTO, ESTAMOS EXPLORANDO</span>
+                  <h2>{busy ? 'Preparando tu proyecto' : JOB_STATUS[job!.status]}</h2>
+                  <p>
+                    {job?.total
+                      ? `${job.processed} de ${job.total} archivos procesados`
+                      : 'Leemos la estructura del proyecto sin ejecutar tu código.'}
+                  </p>
+                  <progress max={job?.total || 1} value={job?.processed || 0} />
+                  <small>Puedes seguir utilizando la interfaz mientras se analiza.</small>
+                  {job && (
+                    <button
+                      className="button secondary"
+                      onClick={() => {
+                        void request(`/api/analyses/${job.id}`, { method: 'DELETE' }).catch((e) =>
+                          setError(e.message),
+                        )
+                      }}
+                    >
+                      Cancelar análisis
+                    </button>
+                  )}
+                </section>
+              )}
+              {!running && job?.status === 'failed' && (
+                <div className="error-banner" role="alert">
+                  <CircleAlert size={18} />
+                  {job.error}
+                </div>
+              )}
+              {!running && job?.status === 'cancelled' && (
+                <div className="notice">Análisis cancelado. Puedes seleccionar otro proyecto.</div>
+              )}
+
+              {report && !running && (
+                <>
+                  <section className="stats-grid">
+                    <article className="stat-card">
+                      <div>
+                        <span>Archivos del proyecto</span>
+                        <Files size={18} />
+                      </div>
+                      <strong>{number(report.summary.files)}</strong>
+                      <small>{number(lines)} líneas de código fuente</small>
+                    </article>
+                    <article className="stat-card">
+                      <div>
+                        <span>Rutinas identificadas</span>
+                        <Braces size={18} />
+                      </div>
+                      <strong>{number(routines)}</strong>
+                      <small>Funciones y subrutinas interpretadas</small>
+                    </article>
+                    <article className="stat-card">
+                      <div>
+                        <span>Hallazgos para revisar</span>
+                        <CircleAlert size={18} />
+                      </div>
+                      <strong>
+                        {findings.length}
+                        <i className="stat-tag">
+                          {findings.filter((f) => f.severity === 'error').length
+                            ? 'Con errores'
+                            : 'Con contexto'}
+                        </i>
+                      </strong>
+                      <small>
+                        {findings.filter((f) => f.severity === 'warning').length} avisos ·{' '}
+                        {findings.filter((f) => f.severity === 'info').length} observaciones
+                      </small>
+                    </article>
+                    <article className="stat-card">
+                      <div>
+                        <span>Cobertura del análisis</span>
+                        <CheckCheck size={18} />
+                      </div>
+                      <strong>
+                        {coverage}
+                        <em>%</em>
+                      </strong>
+                      <small>
+                        {report.summary.ok} de {report.summary.files} archivos completos
+                      </small>
+                    </article>
+                  </section>
+                  <div className="content-tabs">
+                    <button
+                      className={tab === 'overview' ? 'selected' : ''}
+                      onClick={() => setTab('overview')}
+                    >
+                      <LayoutDashboard size={16} />
+                      Resumen
+                    </button>
+                    <button
+                      className={tab === 'explorer' ? 'selected' : ''}
+                      onClick={() => setTab('explorer')}
+                    >
+                      <Code2 size={16} />
+                      Explorador de código
+                    </button>
+                    <span>
+                      <span className="status-dot ok" />
+                      Análisis terminado
+                    </span>
+                  </div>
+                  {tab === 'overview' ? (
+                    <>
+                      <div className="overview-grid">
+                        <section className="panel">
+                          <div className="panel-heading">
+                            <div>
+                              <h2>Dentro del proyecto</h2>
+                              <p>Los archivos con más líneas de código fuente</p>
+                            </div>
+                            <span className="subtle-icon">
+                              <Activity size={19} />
+                            </span>
+                          </div>
+                          <div className="file-chart">
+                            {chartFiles.map((file) => (
+                              <button key={file.path} onClick={() => open(file)}>
+                                <span title={file.path}>
+                                  <FileCode2 size={15} />
+                                  {file.path.split('/').pop()}
                                 </span>
-                                <span>
-                                  {scope.declared_entities} entidades · {scope.loops} bucles
-                                  <ArrowUpRight size={15} />
-                                </span>
+                                <div className="bar-track">
+                                  <i
+                                    style={{
+                                      width: `${((file.physical_lines ?? 0) / maxLines) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                                <b>{number(file.physical_lines ?? 0)}</b>
                               </button>
                             ))}
-                            {!selected.scopes.length && (
-                              <div className="empty-panel">
-                                No hay ámbitos disponibles para este archivo.
-                              </div>
+                          </div>
+                          <button className="panel-link" onClick={() => setTab('explorer')}>
+                            Explorar todos los archivos <ArrowRight size={15} />
+                          </button>
+                        </section>
+                        <section className="panel coverage-panel">
+                          <div className="panel-heading">
+                            <div>
+                              <h2>Una lectura transparente</h2>
+                              <p>Qué hemos podido interpretar</p>
+                            </div>
+                          </div>
+                          <StatusRing report={report} />
+                          <div className="coverage-track">
+                            {(['ok', 'partial', 'failed', 'skipped'] as FileStatus[]).map(
+                              (status) => (
+                                <i
+                                  key={status}
+                                  className={status}
+                                  style={{
+                                    width: `${(report.summary[status] / report.summary.files) * 100}%`,
+                                  }}
+                                />
+                              ),
                             )}
                           </div>
-                        )}
-                        <section className="panel file-findings">
-                          <div className="panel-heading">
-                            <h2>
-                              Hallazgos en este archivo{' '}
-                              <span className="count-label">{selected.findings.length}</span>
-                            </h2>
+                          <div className="coverage-legend">
+                            {(['ok', 'partial', 'failed', 'skipped'] as FileStatus[]).map(
+                              (status) => (
+                                <span key={status}>
+                                  <i className={`status-dot ${status}`} />
+                                  {STATUS[status]}
+                                  <b>{report.summary[status]}</b>
+                                </span>
+                              ),
+                            )}
                           </div>
-                          {selected.findings.length ? (
-                            selected.findings.map((finding, index) => (
-                              <FindingRow
-                                key={index}
-                                finding={finding}
-                                onClick={() => {
-                                  setLine(finding.line)
-                                  setScopeTab(false)
-                                }}
-                              />
-                            ))
-                          ) : (
-                            <p className="quiet-success">
-                              <Check size={16} />
-                              Sin hallazgos en las reglas actuales.
+                          {coverage < 100 && (
+                            <p className="coverage-note">
+                              Los archivos parciales o fallidos no aportan métricas de rutinas. Sus
+                              límites están en los hallazgos.
                             </p>
                           )}
                         </section>
-                      </>
-                    ) : (
-                      <div className="empty-panel">
-                        Selecciona un archivo para explorar su código.
                       </div>
-                    )}
-                  </div>
-                </div>
+                      <FindingsChart
+                        findings={findings}
+                        selected={severity}
+                        onSelect={setSeverity}
+                      />
+                      <section className="panel findings-panel">
+                        <div className="panel-heading">
+                          <div>
+                            <h2>
+                              El siguiente paso está en los detalles{' '}
+                              <span className="count-label">{findings.length}</span>
+                            </h2>
+                            <p>Observaciones para investigar, con su ubicación en el código</p>
+                          </div>
+                          <select
+                            aria-label="Filtrar gravedad"
+                            value={severity}
+                            onChange={(event) => setSeverity(event.target.value)}
+                          >
+                            <option value="all">Todas las gravedades</option>
+                            <option value="warning">Avisos</option>
+                            <option value="info">Observaciones</option>
+                            <option value="error">Errores</option>
+                          </select>
+                        </div>
+                        {visibleFindings.length ? (
+                          visibleFindings.map((finding, index) => (
+                            <FindingRow
+                              key={index}
+                              finding={finding}
+                              onClick={() => openFinding(finding)}
+                            />
+                          ))
+                        ) : (
+                          <div className="no-findings">
+                            <CheckCheck size={23} />
+                            <b>
+                              {findings.length
+                                ? 'Sin hallazgos con este filtro'
+                                : 'Sin hallazgos en las reglas actuales'}
+                            </b>
+                            <p>
+                              El análisis es sintáctico. Esto no valida la corrección científica del
+                              modelo.
+                            </p>
+                          </div>
+                        )}
+                      </section>
+                    </>
+                  ) : (
+                    <>
+                      <ProjectMap
+                        files={report.files}
+                        selected={selected?.path ?? ''}
+                        onSelect={open}
+                      />
+                      <div className="explorer-layout">
+                        <section className="panel file-browser">
+                          <div className="panel-heading">
+                            <h2>
+                              Archivos <span className="count-label">{filteredFiles.length}</span>
+                            </h2>
+                          </div>
+                          <label className="search-box">
+                            <Search size={15} />
+                            <input
+                              aria-label="Buscar archivos"
+                              placeholder="Buscar archivo…"
+                              value={search}
+                              onChange={(event) => setSearch(event.target.value)}
+                            />
+                          </label>
+                          <select
+                            className="file-filter"
+                            aria-label="Filtrar estado"
+                            value={filter}
+                            onChange={(event) => setFilter(event.target.value)}
+                          >
+                            <option value="all">Todos los estados</option>
+                            {Object.entries(STATUS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="file-tree">
+                            <FileTree
+                              files={filteredFiles}
+                              selected={selected?.path ?? ''}
+                              onSelect={(file) => open(file)}
+                            />
+                            {!filteredFiles.length && (
+                              <p className="muted">Sin archivos con este filtro.</p>
+                            )}
+                          </div>
+                        </section>
+                        <div className="file-detail">
+                          {selected && job ? (
+                            <>
+                              <div className="file-detail-heading">
+                                <span>
+                                  <FileCode2 size={18} />
+                                  <b>{selected.path}</b>
+                                </span>
+                                <Badge status={selected.status} />
+                              </div>
+                              <div className="file-mini-stats">
+                                <span>
+                                  <b>{selected.physical_lines ?? '—'}</b> líneas
+                                </span>
+                                <span>
+                                  <b>{selected.metrics?.declared_entities ?? '—'}</b> entidades
+                                  declaradas
+                                </span>
+                                <span>
+                                  <b>{selected.metrics?.max_loop_depth ?? '—'}</b> profundidad de
+                                  bucles
+                                </span>
+                                <span>
+                                  {selected.source_form === 'free'
+                                    ? 'Formato libre'
+                                    : 'Formato fijo'}
+                                </span>
+                              </div>
+                              <ScopeMap
+                                file={selected}
+                                onSelect={(target) => {
+                                  setLine(target)
+                                  setScopeTab(false)
+                                }}
+                              />
+                              <div className="detail-tabs">
+                                <button
+                                  className={!scopeTab ? 'selected' : ''}
+                                  onClick={() => setScopeTab(false)}
+                                >
+                                  Código fuente
+                                </button>
+                                <button
+                                  className={scopeTab ? 'selected' : ''}
+                                  onClick={() => setScopeTab(true)}
+                                >
+                                  Ámbitos y rutinas <span>{selected.scopes.length}</span>
+                                </button>
+                              </div>
+                              {!scopeTab ? (
+                                <CodeViewer id={job.id} path={selected.path} line={line} />
+                              ) : (
+                                <div className="scopes-panel">
+                                  {selected.scopes.map((scope) => (
+                                    <button
+                                      key={`${scope.line}-${scope.qualified_name}`}
+                                      onClick={() => {
+                                        setLine(scope.line)
+                                        setScopeTab(false)
+                                      }}
+                                    >
+                                      <span>
+                                        <Braces size={17} />
+                                        <b>{scope.qualified_name}</b>
+                                        <small>
+                                          {scope.kind} · líneas {scope.line}–{scope.end_line}
+                                        </small>
+                                      </span>
+                                      <span>
+                                        {scope.declared_entities} entidades · {scope.loops} bucles
+                                        <ArrowUpRight size={15} />
+                                      </span>
+                                    </button>
+                                  ))}
+                                  {!selected.scopes.length && (
+                                    <div className="empty-panel">
+                                      No hay ámbitos disponibles para este archivo.
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <section className="panel file-findings">
+                                <div className="panel-heading">
+                                  <h2>
+                                    Hallazgos en este archivo{' '}
+                                    <span className="count-label">{selected.findings.length}</span>
+                                  </h2>
+                                </div>
+                                {selected.findings.length ? (
+                                  selected.findings.map((finding, index) => (
+                                    <FindingRow
+                                      key={index}
+                                      finding={finding}
+                                      onClick={() => {
+                                        setLine(finding.line)
+                                        setScopeTab(false)
+                                      }}
+                                    />
+                                  ))
+                                ) : (
+                                  <p className="quiet-success">
+                                    <Check size={16} />
+                                    Sin hallazgos en las reglas actuales.
+                                  </p>
+                                )}
+                              </section>
+                            </>
+                          ) : (
+                            <div className="empty-panel">
+                              Selecciona un archivo para explorar su código.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
               )}
-            </>
+            </div>
           )}
           <footer className="page-footer">
             <span>

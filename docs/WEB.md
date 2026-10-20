@@ -73,3 +73,12 @@ npm run build
 ```
 
 Las pruebas cubren extracción segura y límites, carga real del ejemplo, estados y errores, descarga, lectura de fuentes autorizadas, cancelación, limpieza y respuesta de la API mientras un trabajo está ocupado. TypeScript verifica la interfaz y Vite construye los recursos. El recorrido de navegador se contrasta con la API real, no con datos simulados.
+
+
+## Apariencia y explicación de la migración
+
+El botón **Ajustes** de la barra superior permite combinar dos estilos (**Moderno** y **Original**) con modo **Claro** u **Oscuro**. El estilo Original recupera el azul RGB 61, 143, 199 y los paneles grises de `MainWindow.java`; es una adaptación web, no una reproducción de Swing. La primera visita toma el modo del dispositivo; las elecciones posteriores se guardan en `localStorage` del navegador. Si el almacenamiento está bloqueado, la elección sigue funcionando durante la sesión y el menú informa de ello.
+
+El menú usa un diálogo nativo: mantiene el foco dentro, se cierra con Escape y devuelve el foco al botón de ajustes. Los grupos de opciones funcionan con teclado. Las transiciones de botones y barras y las animaciones de entrada respetan `prefers-reduced-motion`; el salto del visor también evita el desplazamiento suave con esa preferencia.
+
+La navegación **La migración**, disponible incluso sin cargar un proyecto, explica la autoría original, la comparación Java/Swing/Maven con Python/fparser2/FastAPI/React/Vite/Docker, las correcciones comprobadas y las capacidades que siguen pendientes. No requiere ni sirve los archivos de `reference/`. Cambiar de sección mantiene el informe y el trabajo en curso.
