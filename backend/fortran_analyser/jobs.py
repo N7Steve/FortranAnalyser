@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .archive import extract_sources
+from .archive import bounded_extract
 from .project import analyse_project
 
 logger = logging.getLogger(__name__)
@@ -163,7 +163,7 @@ class JobStore:
             with self.lock:
                 job.status = "extracting"
             directory.mkdir(exist_ok=True)
-            total = extract_sources(data, directory)
+            total = bounded_extract(data, directory, job.name)
             with self.lock:
                 job.total = total
                 job.status = "running"

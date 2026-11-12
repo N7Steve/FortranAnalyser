@@ -14,7 +14,7 @@ El objetivo es explorar proyectos Fortran desde una interfaz web: consultar mét
 
 ## Estado
 
-Motor Python independiente, consola JSON y web React con API FastAPI implementados. Se pueden cargar proyectos ZIP, seguir su análisis, consultar métricas y abrir hallazgos sobre el código. La fase 3 añade una imagen completa, persistencia y un YAML de TrueNAS que construye directamente desde Git.
+Motor Python independiente, consola JSON y web React con API FastAPI implementados. Se pueden cargar proyectos ZIP, 7z y TAR (también gzip/bzip2/xz), descargar informes PDF y consultar grafos de dependencias, complejidad y una nota orientativa. También se puede seguir su análisis, consultar métricas y abrir hallazgos sobre el código. La fase 3 añade una imagen completa, persistencia y un YAML de TrueNAS que construye directamente desde Git.
 
 El [plan de migración](docs/MIGRATION.md) recoge el progreso. Los acuerdos de trabajo están en [AGENTS.md](AGENTS.md), y la [evaluación del parser](docs/PARSER.md) detalla compatibilidad, definición de métricas y límites.
 

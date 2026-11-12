@@ -97,6 +97,11 @@ def create_app() -> FastAPI:
             "application/zip",
             "application/octet-stream",
             "application/x-zip-compressed",
+            "application/x-7z-compressed",
+            "application/gzip",
+            "application/x-tar",
+            "application/x-bzip2",
+            "application/x-xz",
         }:
             raise HTTPException(415, "Envía un archivo ZIP como cuerpo de la petición.")
         try:
@@ -108,7 +113,7 @@ def create_app() -> FastAPI:
             async with asyncio.timeout(30):
                 async for chunk in request.stream():
                     if len(data) + len(chunk) > MAX_UPLOAD:
-                        raise HTTPException(413, "El ZIP supera los 10 MB.")
+                        raise HTTPException(413, "El archivo supera los 10 MB.")
                     data.extend(chunk)
             await run_in_threadpool(store(request).submit, job, bytes(data))
             with store(request).lock:
@@ -146,6 +151,19 @@ def create_app() -> FastAPI:
                 {"Content-Disposition": 'attachment; filename="analysis.json"'} if download else {}
             )
             return JSONResponse(job.report, headers=headers)
+
+    @app.get("/api/analyses/{identifier}/report.pdf")
+    def pdf_report(request: Request, identifier: str):
+        from .pdf_report import render_report
+
+        with store(request).lock:
+            job = completed(request, identifier)
+            report_data, name = job.report, job.name
+        return Response(
+            render_report(report_data, name),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="FortranAnalyser.pdf"'},
+        )
 
     @app.get("/api/analyses/{identifier}/source")
     def source(request: Request, identifier: str, path: str):

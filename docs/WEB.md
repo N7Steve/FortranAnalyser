@@ -42,19 +42,19 @@ El visor representa hasta 200 líneas por página y acorta visualmente las líne
 | --- | --- |
 | `GET /api/health` | Estado del servicio. |
 | `GET /api/example` | ZIP sintético distribuido con la aplicación. |
-| `POST /api/analyses?name=Proyecto&source_form=auto` | Cuerpo ZIP binario con `Content-Type: application/zip`; devuelve identificador y estado, HTTP 202. No usa multipart. |
+| `POST /api/analyses?name=Proyecto&source_form=auto` | Cuerpo comprimido binario con `Content-Type: application/octet-stream`; devuelve identificador y estado, HTTP 202. No usa multipart. |
 | `GET /api/analyses/{id}` | Estado, archivos procesados, total y error si existe. |
 | `GET /api/analyses/{id}/report` | JSON original, disponible al terminar. `?download=true` lo entrega como descarga. |
 | `GET /api/analyses/{id}/source?path=...` | Fuente UTF-8 de un archivo perteneciente al informe. No permite leer rutas arbitrarias. |
 | `DELETE /api/analyses/{id}` | Cancela un análisis activo (202) o elimina sus resultados temporales si ya terminó (200). |
 
-Estados de trabajo: `uploading`, `queued`, `extracting`, `running`, `completed`, `failed`, `cancelled`. Que el trabajo termine no implica que todas las fuentes se hayan interpretado: sus estados siguen estando en el informe. Un ZIP inválido es un fallo del trabajo, no un informe vacío exitoso.
+Estados de trabajo: `uploading`, `queued`, `extracting`, `running`, `completed`, `failed`, `cancelled`. Que el trabajo termine no implica que todas las fuentes se hayan interpretado: sus estados siguen estando en el informe. Un comprimido inválido es un fallo del trabajo, no un informe vacío exitoso.
 
 ## Límites y conservación
 
-- ZIP de hasta 10 MB; carga limitada a 30 segundos.
+- ZIP, 7z, TAR y compresiones gzip/bzip2/xz de hasta 10 MB; carga limitada a 30 segundos y descompresión a 20 segundos.
 - Hasta 1.000 entradas, 20 MB descomprimidos totales y 100 fuentes Fortran de hasta 2 MB cada una.
-- Rechazo de rutas absolutas, navegación `..`, separadores ambiguos, nombres reservados, duplicados sin distinción de mayúsculas, enlaces, archivos especiales y ZIP cifrados.
+- Rechazo de rutas absolutas, navegación `..`, separadores ambiguos, nombres reservados, duplicados sin distinción de mayúsculas, enlaces, archivos especiales y archivos cifrados.
 - Un trabajador, hasta tres trabajos activos/en cola y ocho análisis retenidos por proceso. Las fuentes se analizan secuencialmente con un máximo de cinco segundos por archivo.
 - Los archivos de un trabajo inválido o cancelado se limpian; los terminados se conservan en un directorio temporal privado hasta su eliminación o parada del servidor.
 - El navegador recuerda el identificador del último trabajo en su pestaña para recuperarlo al recargar. Un nuevo análisis sustituye al anterior. El arranque local sin `FORTRAN_DATA_DIR` es temporal. La fase 3 añade persistencia opcional, activada en Docker; ver [despliegue](DEPLOYMENT.md).
@@ -82,3 +82,18 @@ El botón **Ajustes** de la barra superior permite combinar dos estilos (**Moder
 El menú usa un diálogo nativo: mantiene el foco dentro, se cierra con Escape y devuelve el foco al botón de ajustes. Los grupos de opciones funcionan con teclado. Las transiciones de botones y barras y las animaciones de entrada respetan `prefers-reduced-motion`; el salto del visor también evita el desplazamiento suave con esa preferencia.
 
 La navegación **La migración**, disponible incluso sin cargar un proyecto, explica la autoría original, la comparación Java/Swing/Maven con Python/fparser2/FastAPI/React/Vite/Docker, las correcciones comprobadas y las capacidades que siguen pendientes. No requiere ni sirve los archivos de `reference/`. Cambiar de sección mantiene el informe y el trabajo en curso.
+
+
+## Estructura, nota e informe PDF
+
+El resumen muestra el grafo de módulos, rutinas y tipos derivados (las clases de Fortran), las dependencias USE/CALL, pertenencia, herencia y referencias a tipos. La tabla de relaciones incluye ubicación y destinos no resueltos. Las referencias a tipos no implican propiedad del objeto. El grafo de dependencias no es un grafo de flujo de control.
+
+La CC estructural cuenta una base por programa/subrutina/función y una decisión por IF, ELSE IF, DO con control, CASE no DEFAULT, WHERE o FORALL. No cuenta operadores booleanos ni EXIT/CYCLE como decisiones. No reconstruye un CFG completo (por ejemplo, GOTO aritmético y saltos no estructurados quedan fuera). Se suman las rutinas por archivo y los archivos completos por proyecto, indicando cobertura parcial si corresponde. Un archivo completo sin unidades ejecutables tiene CC 0.
+
+Perfil orientativo 0–10: `6 × fracción de ámbitos con IMPLICIT NONE + 2 si profundidad de bucles ≤ 3 + 1 si hay EXIT + 1 si hay CYCLE`. Los bonus se otorgan una vez por archivo, solo sobre instrucciones AST; cadenas y comentarios no puntúan. La nota global es la media por archivo y no se emite si hay fuentes parciales, fallidas u omitidas. No sustituye la revisión de corrección científica ni reproduce la puntuación Java.
+
+«Descargar PDF» llama a `GET /api/analyses/{id}/report.pdf`. Incluye resumen, cobertura, métodos, diagrama, lista completa de relaciones, CC por rutina/archivo/proyecto, notas, métricas y hallazgos localizados. El sello virtual de FortranAnalyser es visual y acompaña una huella SHA-256 del JSON canónico (`json.dumps(report, sort_keys=True, ensure_ascii=True)` codificado UTF-8); no es una firma con certificado. Los informes guardados antes de esta versión necesitan un nuevo análisis para disponer de las métricas nuevas.
+
+Formatos soportados: ZIP, 7z, TAR, TAR.GZ/TGZ, TAR.BZ2/TBZ2, TAR.XZ/TXZ y fuentes individuales `.f90.gz` (también bzip2/xz y otras extensiones Fortran). La detección usa el contenido, no la extensión. Para fuentes individuales, enviar el nombre completo en `name`. No se admiten RAR, cifrados, multipartes ni extracción recursiva de comprimidos internos.
+
+El icono `frontend/public/original-icon.png` procede de `fortranAnalyserIcon.png`, del proyecto original de Michael García Rodríguez, bajo la licencia GPL del repositorio. La copia local `reference/` permanece ignorada y sin cambios.

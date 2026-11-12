@@ -83,6 +83,21 @@ Quedan fuera inicialmente: soporte universal de dialectos Fortran, estimación d
 
 El proyecto original reside únicamente en `reference/`, ignorado por Git. Revisar selectivamente `TasksBar.java` (métricas), `CycloComplexity.java` (complejidad), `NoGUI.java` (modo consola), `MainWindow.java` (interfaz), `PDF.java` e idiomas cuando sean necesarios.
 
-No trasladar automáticamente sus puntuaciones: premiar `EXIT`/`CYCLE`, contar palabras como instrucciones o deducir rendimiento a partir del número de variables no constituye una base suficiente.
+Por petición explícita, se añade un perfil orientativo de calidad con bonus por `EXIT`/`CYCLE`. Su fórmula y límites son visibles; no se presenta como equivalencia con la puntuación Java, validación científica ni estimación de rendimiento. Las instrucciones y decisiones se cuentan desde el AST.
 
 Al terminar una entrega, marcar lo completado, registrar los límites encontrados y concretar el siguiente paso. El coste principal que debe despejar la primera entrega es la compatibilidad del parser con los modelos reales.
+
+
+## Estructura e informes (2026-11-12)
+
+- [x] Tema adicional Clásico naranja (claro/oscuro) e icono original, conservando atribución.
+- [x] Carga ZIP, 7z, TAR, TAR.GZ/TGZ, TAR.BZ2, TAR.XZ y fuentes gzip/bzip2/xz.
+- [x] Mantener límites de archivos, bytes, rutas y enlaces; descompresión en proceso con límite de 20 segundos.
+- [x] Grafo estático de módulos, rutinas, tipos derivados, USE, CALL explícito, referencias a tipos y EXTENDS.
+- [x] CC estructural por rutina, archivo y suma de proyecto; cobertura parcial explícita.
+- [x] Nota orientativa adaptada con bonus únicos por EXIT/CYCLE y fórmula publicada.
+- [x] PDF descargable con métricas, hallazgos, estados, diagramas, relaciones y sello virtual.
+
+No se promete cualquier formato existente: RAR, archivos multipartes, cifrados y contenedores anidados no están soportados. Los gzip de una sola fuente necesitan conservar la extensión Fortran en el nombre enviado. El grafo no resuelve despacho dinámico, renombrados USE, genéricos ni llamadas a funciones en expresiones; los destinos externos o ambiguos quedan visibles sin resolver. No se calcula CC a partir del grafo de dependencias. La firma es un sello visual y una huella SHA-256 del JSON canónico, sin certificado digital. La puntuación es una adaptación pequeña y explícita, no una reproducción de las once métricas Java.
+
+Verificación de esta entrega: 88 pruebas Python en Windows y Linux (etapa test de Docker), Ruff, TypeScript y construcción web; PDF de muestra renderizado para revisión visual. Navegador Chromium: tema naranja persistente, ejemplo, descarga PDF y móvil a 390 px sin desbordamiento ni errores JavaScript. El despliegue en el NAS real sigue pendiente. Siguiente paso: contrastar grafos y complejidad con un proyecto científico real, incluyendo sus convenciones de módulos e interfaces.

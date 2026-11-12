@@ -1,3 +1,4 @@
+import StructureReport from './StructureReport'
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import {
@@ -225,7 +226,7 @@ export default function App() {
 
   async function upload(file: Blob, name: string) {
     if (file.size > 10_000_000) {
-      setError('El ZIP debe ocupar como máximo 10 MB.')
+      setError('El archivo debe ocupar como máximo 10 MB.')
       return
     }
     setBusy(true)
@@ -241,7 +242,7 @@ export default function App() {
         `/api/analyses?name=${encodeURIComponent(name)}&source_form=${form}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/zip' },
+          headers: { 'Content-Type': 'application/octet-stream' },
           body: file,
         },
       )
@@ -267,11 +268,7 @@ export default function App() {
   }
   function choose(file?: File) {
     if (!file) return
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      setError('Selecciona un proyecto en formato ZIP.')
-      return
-    }
-    void upload(file, file.name.replace(/\.zip$/i, '').slice(0, 120) || 'Proyecto')
+    void upload(file, file.name.slice(0, 120) || 'Proyecto')
   }
   function drop(event: DragEvent) {
     event.preventDefault()
@@ -315,7 +312,7 @@ export default function App() {
       <aside className="sidebar">
         <a className="brand" href="/" aria-label="FortranAnalyser, inicio">
           <span className="brand-mark">
-            F<span>_</span>
+            <img src="/original-icon.png" alt="" width="38" height="38" />
           </span>
           <span>
             Fortran<span>Analyser</span>
@@ -405,6 +402,12 @@ export default function App() {
                       <ArrowDownToLine size={16} />
                       Exportar JSON
                     </a>
+                    <a
+                      className="button secondary"
+                      href={apiUrl(`/api/analyses/${job?.id}/report.pdf`)}
+                    >
+                      Descargar PDF
+                    </a>
                     <button
                       className="button primary"
                       disabled={!!running}
@@ -420,8 +423,8 @@ export default function App() {
                 ref={input}
                 className="visually-hidden"
                 type="file"
-                accept=".zip,application/zip"
-                aria-label="Seleccionar proyecto ZIP"
+                accept=".zip,.7z,.tar,.tgz,.tar.gz,.gz,.gzip,.bz2,.tbz2,.xz,.txz"
+                aria-label="Seleccionar proyecto comprimido"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => choose(e.target.files?.[0])}
               />
               {error && (
@@ -484,7 +487,7 @@ export default function App() {
                       </p>
                       <button className="button primary" onClick={() => input.current?.click()}>
                         <Plus size={16} />
-                        Seleccionar ZIP
+                        Seleccionar archivo
                       </button>
                       <label className="form-select">
                         Formato de código
@@ -568,6 +571,7 @@ export default function App() {
                 <div className="notice">Análisis cancelado. Puedes seleccionar otro proyecto.</div>
               )}
 
+              {report && !running && <StructureReport report={report} />}
               {report && !running && (
                 <>
                   <section className="stats-grid">

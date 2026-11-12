@@ -56,7 +56,7 @@ def _line(node) -> int:
 
 
 def _scope_name(node) -> str:
-    first = node.content[0]
+    first = next((c for c in node.content if type(c).__name__ != "Comment"), node.content[0])
     # An unnamed main program starts with its specification/execution part.
     if type(first).__name__ in {"Module_Stmt", "Program_Stmt"}:
         return str(first.items[1])
@@ -174,6 +174,9 @@ def _extract(tree, path: str, physical_lines: int) -> FileResult:
         max_loop_depth=max_depth,
         **totals,
     )
+    from .structure import extract_structure
+
+    result.analysis = extract_structure(tree, result)
     return result
 
 

@@ -183,10 +183,13 @@ export default function MigrationPage() {
             <li>Gráficos de cobertura y gravedad basados en el informe real.</li>
             <li>Mapa de archivos por líneas o hallazgos y vista de posición de rutinas.</li>
             <li>Fuentes e informes conservados al recrear el contenedor con su volumen.</li>
-            <li>Cargas limitadas, extracción ZIP validada y análisis sin ejecutar el modelo.</li>
             <li>
-              Temas Original y Moderno, modo claro u oscuro y preferencias guardadas en el
-              navegador.
+              Cargas limitadas, extracción de comprimidos validada y análisis sin ejecutar el
+              modelo.
+            </li>
+            <li>
+              Temas Original, Moderno y Clásico naranja, modo claro u oscuro y preferencias
+              guardadas en el navegador.
             </li>
           </ul>
         </section>
@@ -198,14 +201,17 @@ export default function MigrationPage() {
             </div>
           </div>
           <ul>
-            <li>El PDF y los idiomas de la aplicación original todavía no están migrados.</li>
             <li>
-              No se traslada la nota global de calidad ni se premia el uso de EXIT o CYCLE: esos
-              criterios necesitan contexto.
+              El informe PDF ya está disponible. Los idiomas de la aplicación original siguen
+              pendientes.
             </li>
             <li>
-              No hay todavía historial visual, comparaciones, mapa de llamadas ni diagnóstico de
-              compilación.
+              La nota orientativa incluye bonus por EXIT y CYCLE, con fórmula visible. No equivale a
+              la nota Java ni demuestra calidad científica.
+            </li>
+            <li>
+              Hay un grafo estático de USE, CALL, tipos y herencia. Siguen pendientes el historial
+              visual, las comparaciones y el diagnóstico de compilación.
             </li>
             <li>
               fparser2 no cubre todos los dialectos. Interpretar sintaxis no demuestra corrección

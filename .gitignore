@@ -40,3 +40,7 @@ coverage/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local visual verification artifacts
+/tmp/
+/output/

@@ -1268,3 +1268,80 @@ select,
     transform: none;
   }
 }
+
+:root[data-theme='heritage'] {
+  --ui-bg: #ece7e1;
+  --ui-surface: #fffdf9;
+  --ui-raised: #f7f2ec;
+  --ui-soft: #fff0db;
+  --ui-border: #d7c4b1;
+  --ui-text: #35291e;
+  --ui-muted: #6e5948;
+  --ui-accent: #a94b08;
+  --ui-accent-hover: #833802;
+  --ui-nav: #493323;
+  --ui-nav-active: #78451f;
+  --ui-nav-text: #fff5e9;
+  --ui-nav-muted: #edd5bc;
+  --ui-nav-highlight: #ffc078;
+  --ui-radius: 5px;
+}
+:root[data-theme='heritage'][data-mode='dark'] {
+  --ui-bg: #211b17;
+  --ui-surface: #302720;
+  --ui-raised: #3b3027;
+  --ui-soft: #4e3522;
+  --ui-border: #715641;
+  --ui-text: #fff0df;
+  --ui-muted: #ddc2aa;
+  --ui-accent: #ffba76;
+  --ui-accent-hover: #ffd09e;
+  --ui-accent-ink: #382313;
+}
+.preview-heritage {
+  background: #ece7e1;
+}
+.preview-heritage > i {
+  background: #a94b08;
+}
+.brand-mark img {
+  object-fit: contain;
+  max-width: 100%;
+}
+.structure-report {
+  padding: 24px;
+  margin: 20px 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+}
+.structure-report details {
+  margin: 16px 0;
+}
+.structure-report summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.structure-report p {
+  overflow-wrap: anywhere;
+}
+.structure-scroll {
+  overflow: auto;
+  max-height: 650px;
+  margin: 16px 0;
+}
+.structure-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.structure-scroll th,
+.structure-scroll td {
+  padding: 10px;
+  border-bottom: 1px solid var(--ui-border);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.structure-scroll svg {
+  min-width: 750px;
+  color: var(--ui-text);
+}

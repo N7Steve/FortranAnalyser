@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Check, Moon, Palette, Settings2, Sun, X } from 'lucide-react'
 
-type Preferences = { theme: 'modern' | 'original'; mode: 'light' | 'dark' }
+type Preferences = { theme: 'modern' | 'original' | 'heritage'; mode: 'light' | 'dark' }
 const STORAGE_KEY = 'fortran-appearance'
 
 function readPreferences(): Preferences {
@@ -12,7 +12,7 @@ function readPreferences(): Preferences {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
     return {
-      theme: saved?.theme === 'original' ? 'original' : 'modern',
+      theme: ['original', 'heritage'].includes(saved?.theme) ? saved.theme : 'modern',
       mode: saved?.mode === 'dark' || saved?.mode === 'light' ? saved.mode : fallback.mode,
     }
   } catch {
@@ -85,7 +85,7 @@ export default function SettingsMenu() {
         <fieldset>
           <legend>Estilo de la interfaz</legend>
           <div className="theme-options">
-            {(['modern', 'original'] as const).map((theme) => (
+            {(['modern', 'original', 'heritage'] as const).map((theme) => (
               <label
                 key={theme}
                 className={`theme-option ${preferences.theme === theme ? 'chosen' : ''}`}
@@ -106,13 +106,19 @@ export default function SettingsMenu() {
                   </span>
                 </span>
                 <span className="theme-option-title">
-                  {theme === 'modern' ? 'Moderno' : 'Original'}
+                  {theme === 'modern'
+                    ? 'Moderno'
+                    : theme === 'heritage'
+                      ? 'Clásico naranja'
+                      : 'Original'}
                   {preferences.theme === theme && <Check size={16} />}
                 </span>
                 <small>
                   {theme === 'modern'
                     ? 'Azul índigo, superficies suaves y bordes redondeados.'
-                    : 'Azul y grises inspirados en la aplicación Java original.'}
+                    : theme === 'heritage'
+                      ? 'Naranja, paneles grises y el icono histórico.'
+                      : 'Azul y grises inspirados en la aplicación Java original.'}
                 </small>
               </label>
             ))}

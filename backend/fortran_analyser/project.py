@@ -166,4 +166,8 @@ def analyse_project(
     }
     summary["files"] = len(results)
     summary["findings"] = sum(len(r.findings) for r in results)
-    return ProjectResult("1", "1", f"fparser2 {parser_version} (f2008)", results, summary)
+    from .structure import project_structure
+
+    return ProjectResult(
+        "1", "2", f"fparser2 {parser_version} (f2008)", results, summary, project_structure(results)
+    )

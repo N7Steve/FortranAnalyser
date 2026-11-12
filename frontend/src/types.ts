@@ -39,10 +39,26 @@ export interface SourceFile {
   metrics: Metrics | null
   scopes: Scope[]
   findings: Finding[]
+  analysis?: {
+    cyclomatic_complexity: number
+    quality_score: number
+    exit_count: number
+    cycle_count: number
+    routines: { name: string; line: number; complexity: number }[]
+  }
 }
 export interface Report {
   schema_version: string
   rules_version: string
+  analysis?: {
+    nodes: { id: string; name: string; kind: string; path: string; line: number }[]
+    edges: { source: string; target: string; kind: string; line: number; resolved: boolean }[]
+    cyclomatic_complexity: number
+    quality_score: number | null
+    complete: boolean
+    method: string
+    quality_method: string
+  }
   parser: string
   files: SourceFile[]
   summary: {

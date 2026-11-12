@@ -53,6 +53,7 @@ class FileResult:
     metrics: Metrics | None = None
     scopes: list[Scope] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
+    analysis: dict | None = None
 
 
 @dataclass
@@ -62,6 +63,7 @@ class ProjectResult:
     parser: str
     files: list[FileResult]
     summary: dict
+    analysis: dict | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

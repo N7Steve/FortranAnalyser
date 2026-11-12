@@ -21,3 +21,6 @@ reports
 **/*.tsbuildinfo
 **/.idea
 **/.vscode
+
+tmp
+output
