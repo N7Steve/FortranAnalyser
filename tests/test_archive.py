@@ -91,7 +91,36 @@ def test_limits_include_non_source_payloads(tmp_path, monkeypatch):
         extract_sources(data, tmp_path)
 
 
-def test_limits_archive_entry_count(tmp_path):
-    data = bundle([(f"dir/file{i}.txt", "") for i in range(1001)])
-    with pytest.raises(ValueError, match="1.000 entradas"):
-        extract_sources(data, tmp_path)
+@pytest.mark.parametrize("format", ["zip", "tar", "7z"])
+def test_accepts_more_than_one_thousand_entries(tmp_path, format):
+    import tarfile
+
+    import py7zr
+
+    entries = [(f"dir/file{i}.txt", "") for i in range(1100)]
+    entries.append(("p.f90", "program p\nend\n"))
+    if format == "zip":
+        data = bundle(entries)
+    else:
+        buffer = io.BytesIO()
+        if format == "tar":
+            with tarfile.open(fileobj=buffer, mode="w") as archive:
+                for name, content in entries:
+                    member = tarfile.TarInfo(name)
+                    member.size = len(content)
+                    archive.addfile(member, io.BytesIO(content.encode()))
+        else:
+            with py7zr.SevenZipFile(buffer, "w") as archive:
+                for name, content in entries:
+                    archive.writestr(content, name)
+        data = buffer.getvalue()
+    assert extract_sources(data, tmp_path) == 1
+    assert (tmp_path / "p.f90").read_text() == "program p\nend\n"
+    assert not (tmp_path / "dir").exists()
+
+
+def test_paths_after_one_thousand_entries_are_still_validated(tmp_path):
+    entries = [(f"file{i}.txt", "") for i in range(1100)]
+    entries.append(("../escape.f90", "program p\nend"))
+    with pytest.raises(ValueError, match="ruta"):
+        extract_sources(bundle(entries), tmp_path)

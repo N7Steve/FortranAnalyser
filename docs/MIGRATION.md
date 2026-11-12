@@ -145,3 +145,11 @@ La imagen remota debe reconstruirse y recrearse; no se ha modificado el NAS ni C
 
 
 Validación: 102 pruebas pasan sobre el paquete instalado en Docker Linux. Recepción local por bloques de los adjuntos reales (129.853.190 bytes en 16 peticiones y 77.185.588 bytes en 10), sustituyendo la extracción por un comprobador. Navegador con red limitada: progreso, cancelación y posterior recepción/análisis de un ZIP sintético de 24 MiB; se observan cuatro peticiones PUT para esa carga. Compilación TypeScript/Vite y Ruff correctos.
+
+
+## Cantidad de entradas del comprimido (2026-11-12)
+
+- [x] Retirar el máximo de 1.000 entradas para ZIP, TAR y 7z, mediante el recolector común.
+- [x] Verificar extracción con más de 1.000 entradas en los tres formatos y rechazo de rutas inseguras después de ese umbral.
+
+La cantidad de entradas deja de tener una cuota fija. No se promete memoria ni tiempo infinitos: siguen vigentes 4 GiB de subida, 8 GiB expandidos, 30 minutos de extracción, 100 fuentes Fortran, 2 MB por fuente y 20 MB de fuentes en total. La comprobación de duplicados mantiene un índice de rutas en memoria. Los resultados anteriores sobre la barrera de 1.000 entradas corresponden al estado anterior a esta entrega.

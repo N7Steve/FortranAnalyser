@@ -53,7 +53,7 @@ Estados de trabajo: `uploading`, `queued`, `extracting`, `running`, `completed`,
 ## Límites y conservación
 
 - ZIP, 7z, TAR y compresiones gzip/bzip2/xz de hasta 4 GiB (4.294.967.296 bytes); inactividad de carga limitada a 120 segundos, duración total a 24 horas y descompresión a 30 minutos.
-- Hasta 1.000 entradas, 8 GiB descomprimidos totales, 20 MB de fuentes en total y 100 fuentes Fortran de hasta 2 MB cada una.
+- Sin límite fijo de cantidad de entradas; 8 GiB descomprimidos totales, 20 MB de fuentes en total y 100 fuentes Fortran de hasta 2 MB cada una.
 - Rechazo de rutas absolutas, navegación `..`, separadores ambiguos, nombres reservados, duplicados sin distinción de mayúsculas, enlaces, archivos especiales y archivos cifrados.
 - Un trabajador, hasta tres trabajos activos/en cola y ocho análisis retenidos por proceso. Las fuentes se analizan secuencialmente con un máximo de cinco segundos por archivo.
 - Los archivos de un trabajo inválido o cancelado se limpian; los terminados se conservan en un directorio temporal privado hasta su eliminación o parada del servidor.
@@ -112,7 +112,7 @@ La API escribe los bloques recibidos directamente en un archivo temporal del vol
 
 Desde 20 MiB, la web abre un modal con progreso real de transferencia mediante XMLHttpRequest: porcentaje, MiB enviados, espera de confirmación y cancelación (también con Escape). El 100 % indica transferencia enviada; la descompresión y el análisis se muestran después por separado. Una desconexión o cancelación puede tardar hasta 120 segundos en liberar la carga en el servidor.
 
-Se aceptan 4 GiB de comprimido y hasta 8 GiB de contenido expandido. Siguen vigentes 1.000 entradas, 100 fuentes Fortran, 2 MB por fuente y 20 MB de fuentes en conjunto. Los contenedores TAR comprimidos se expanden en un temporal de disco; ZIP solo escribe fuentes y 7z descarta los miembros no utilizados. Se necesitan hasta unos 20 GiB libres para tres cargas máximas y una expansión TAR en curso, además de los informes retenidos. El volumen debe disponer de ese espacio: aumentar la subida no amplía el almacenamiento físico.
+Se aceptan 4 GiB de comprimido y hasta 8 GiB de contenido expandido. No hay límite fijo de entradas del contenedor. Siguen vigentes 100 fuentes Fortran, 2 MB por fuente y 20 MB de fuentes en conjunto. Los contenedores TAR comprimidos se expanden en un temporal de disco; ZIP solo escribe fuentes y 7z descarta los miembros no utilizados. Se necesitan hasta unos 20 GiB libres para tres cargas máximas y una expansión TAR en curso, además de los informes retenidos. El volumen debe disponer de ese espacio: aumentar la subida no amplía el almacenamiento físico.
 
 Si hay un proxy inverso delante, configurar también su límite de cuerpo a al menos 4 GiB y permitir peticiones de larga duración; un rechazo del proxy no llega a esta API. El acceso directo al puerto 8890 evita ese límite adicional.
 

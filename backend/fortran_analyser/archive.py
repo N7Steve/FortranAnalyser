@@ -14,7 +14,6 @@ MAX_UPLOAD = 4 * 1024**3
 MAX_EXPANDED = 8 * 1024**3
 MAX_SOURCE = 2_000_000
 MAX_TOTAL_SOURCES = 20_000_000
-MAX_ENTRIES = 1_000
 MAX_SOURCES = 100
 EXTRACTION_TIMEOUT = 1800
 _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.I)
@@ -46,12 +45,9 @@ class _Collector:
     def __init__(self, destination):
         self.destination = destination
         self.seen = set()
-        self.expanded = self.entries = self.sources = self.source_bytes = 0
+        self.expanded = self.sources = self.source_bytes = 0
 
     def member(self, name, size, directory=False):
-        self.entries += 1
-        if self.entries > MAX_ENTRIES:
-            raise ValueError("El archivo supera las 1.000 entradas.")
         parts = _parts(name, self.seen)
         self.expanded += size
         if self.expanded > MAX_EXPANDED:
