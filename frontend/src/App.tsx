@@ -161,6 +161,7 @@ export default function App() {
   const [drag, setDrag] = useState(false)
   const [form, setForm] = useState('auto')
   const [persistent, setPersistent] = useState(false)
+  const [serverUploadLimit, setServerUploadLimit] = useState<number | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(
     null,
@@ -178,8 +179,14 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController()
-    request<{ persistent: boolean }>('/api/config', { signal: controller.signal })
-      .then((result) => setPersistent(result.persistent))
+    request<{ persistent: boolean; max_upload_bytes?: number }>('/api/config', {
+      signal: controller.signal,
+    })
+      .then((result) => {
+        setPersistent(result.persistent)
+        if (typeof result.max_upload_bytes === 'number' && result.max_upload_bytes > 0)
+          setServerUploadLimit(result.max_upload_bytes)
+      })
       .catch(() => {
         /* Storage mode is informational; analysis errors have their own UI. */
       })
@@ -238,6 +245,12 @@ export default function App() {
   async function upload(file: Blob, name: string) {
     if (file.size > 4 * 1024 ** 3) {
       setError('El archivo debe ocupar como máximo 4 GiB.')
+      return
+    }
+    if (serverUploadLimit !== null && file.size > serverUploadLimit) {
+      setError(
+        `La API desplegada permite ${(serverUploadLimit / 1024 ** 2).toFixed(1)} MiB, aunque esta web permite 4 GiB. Actualiza también el contenedor de la API.`,
+      )
       return
     }
     setBusy(true)
@@ -571,6 +584,11 @@ export default function App() {
                         <ChevronDown size={13} />
                       </label>
                       <small>Hasta 4 GiB · 100 archivos Fortran</small>
+                      <small>
+                        {serverUploadLimit === null
+                          ? 'La API no informa de su límite. Comprueba /api/config si la carga se rechaza.'
+                          : `Límite informado por la API: ${(serverUploadLimit / 1024 ** 3).toFixed(2)} GiB`}
+                      </small>
                     </div>
                   </section>
                   <div className="intro-grid">

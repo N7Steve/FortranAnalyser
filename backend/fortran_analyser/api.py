@@ -4,6 +4,7 @@ import asyncio
 import io
 import os
 import tempfile
+import time
 import zipfile
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
@@ -53,7 +54,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["Content-Type"],
     )
 
@@ -72,11 +73,16 @@ def create_app() -> FastAPI:
 
     @app.get("/api/config")
     def configuration(request: Request):
-        return {"persistent": store(request).persistent}
+        return {
+            "persistent": store(request).persistent,
+            "max_upload_bytes": MAX_UPLOAD,
+            "upload_chunk_bytes": 8 * 1024**2,
+        }
 
     @app.get("/api/analyses")
     def analyses(request: Request):
         with store(request).lock:
+            store(request).expire_uploads()
             return [job.snapshot() for job in store(request).jobs.values()]
 
     @app.get("/api/example")
@@ -86,6 +92,81 @@ def create_app() -> FastAPI:
             for path in sorted(Path(__file__).with_name("example").iterdir()):
                 archive.write(path, f"example/{path.name}")
         return Response(buffer.getvalue(), media_type="application/zip")
+
+    @app.post("/api/uploads", status_code=201)
+    def start_upload(
+        request: Request,
+        name: str = Query(default="Proyecto", min_length=1, max_length=120),
+        source_form: Literal["auto", "free", "fixed"] = "auto",
+    ):
+        with store(request).lock:
+            try:
+                job = store(request).create(name, source_form)
+                job.chunked = True
+            except ValueError as exc:
+                raise HTTPException(429, str(exc)) from exc
+            try:
+                (store(request).root / f"{job.id}.upload").touch(exist_ok=False)
+            except OSError as exc:
+                store(request).jobs.pop(job.id, None)
+                raise HTTPException(507, "No se pudo reservar espacio para la carga.") from exc
+            return job.snapshot()
+
+    @app.put("/api/uploads/{identifier}")
+    async def upload_chunk(request: Request, identifier: str, offset: int = Query(ge=0)):
+        with store(request).lock:
+            job = job_for(request, identifier)
+            if job.status != "uploading" or job.cancel.is_set():
+                raise HTTPException(409, "La carga ya no admite bloques.")
+            job.last_activity = time.monotonic()
+        data = bytearray()
+        try:
+            async with asyncio.timeout(120):
+                async for chunk in request.stream():
+                    if len(data) + len(chunk) > 8 * 1024**2:
+                        raise HTTPException(413, "Cada bloque admite hasta 8 MiB.")
+                    data.extend(chunk)
+        except TimeoutError as exc:
+            raise HTTPException(408, "Tiempo de recepción del bloque agotado.") from exc
+        if not data:
+            raise HTTPException(400, "Bloque vacío.")
+
+        def append():
+            with store(request).lock:
+                current = job_for(request, identifier)
+                if current.status != "uploading" or current.cancel.is_set():
+                    raise HTTPException(409, "La carga ya no admite bloques.")
+                path = store(request).root / f"{identifier}.upload"
+                if path.stat().st_size != offset:
+                    raise HTTPException(409, "Bloque fuera de orden. Vuelve a iniciar la subida.")
+                if offset + len(data) > MAX_UPLOAD:
+                    raise HTTPException(413, "El archivo supera los 4 GiB.")
+                try:
+                    with path.open("ab") as output:
+                        output.write(data)
+                except OSError as exc:
+                    # Roll back a partial write so a failed request cannot corrupt the offset.
+                    with path.open("r+b") as output:
+                        output.truncate(offset)
+                    raise HTTPException(
+                        507, "No se pudo guardar el bloque. Revisa el disco."
+                    ) from exc
+                current.last_activity = time.monotonic()
+                return {"received": offset + len(data)}
+
+        return await run_in_threadpool(append)
+
+    @app.post("/api/uploads/{identifier}/complete", status_code=202)
+    def finish_upload(request: Request, identifier: str, size: int = Query(gt=0, le=MAX_UPLOAD)):
+        with store(request).lock:
+            job = job_for(request, identifier)
+            path = store(request).root / f"{identifier}.upload"
+            if job.status != "uploading" or job.cancel.is_set():
+                raise HTTPException(409, "La carga ya está finalizada o cancelada.")
+            if path.stat().st_size != size:
+                raise HTTPException(409, "La carga no tiene el tamaño esperado.")
+            store(request).submit(job, path)
+            return job.snapshot()
 
     @app.post("/api/analyses", status_code=202)
     async def upload(

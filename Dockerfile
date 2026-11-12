@@ -15,13 +15,14 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md LICENSE.txt ./
 COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv \
+    uv cache clean fortran-analyser && \
     uv sync --frozen --no-dev --extra web --no-editable --python /usr/local/bin/python
 
 FROM backend AS test
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --extra web --extra dev --no-editable --python /usr/local/bin/python
 COPY tests/ ./tests/
-RUN uv run --frozen --extra web --extra dev python -m pytest -q
+RUN /app/.venv/bin/python -m pytest -q
 
 FROM python:3.12-slim-bookworm AS runtime
 LABEL org.opencontainers.image.title="FortranAnalyser" \

@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -28,6 +29,8 @@ class Job:
     total: int = 0
     error: str | None = None
     report: dict | None = None
+    chunked: bool = False
+    last_activity: float = field(default_factory=time.monotonic)
     cancel: threading.Event = field(default_factory=threading.Event)
 
     def snapshot(self):
@@ -138,8 +141,19 @@ class JobStore:
                     "Ignoring unreadable analysis record %s", directory.name, exc_info=True
                 )
 
+    def expire_uploads(self):
+        with self.lock:
+            for job in list(self.jobs.values()):
+                if (
+                    job.chunked
+                    and job.status == "uploading"
+                    and time.monotonic() - job.last_activity > 1800
+                ):
+                    self.delete(job.id)
+
     def create(self, name: str, source_form: str) -> Job:
         with self.lock:
+            self.expire_uploads()
             if sum(j.status not in TERMINAL for j in self.jobs.values()) >= 3:
                 raise ValueError(
                     "Hay tres análisis activos. Espera o cancela uno en Análisis del servidor."
@@ -218,7 +232,9 @@ class JobStore:
             job = self.jobs[identifier]
             if job.status not in TERMINAL:
                 job.cancel.set()
-                return False
+                if job.status != "uploading" or not job.chunked:
+                    return False
+                (self.root / f"{identifier}.upload").unlink(missing_ok=True)
             shutil.rmtree(self.root / job.id, ignore_errors=True)
             del self.jobs[identifier]
             return True

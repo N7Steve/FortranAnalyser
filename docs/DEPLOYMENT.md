@@ -84,3 +84,21 @@ La etapa `test` ejecuta las pruebas Python en Linux, sin añadir sus dependencia
 ### Espacio para cargas grandes
 
 La subida máxima es de 4 GiB. Los comprimidos y temporales de descompresión se escriben en el volumen de análisis, no en `/tmp`. Para tres cargas máximas y una expansión TAR de hasta 8 GiB, reservar al menos 20 GiB libres adicionales a los análisis guardados. Si se usa un proxy inverso, aumentar también su límite de cuerpo a 4 GiB y sus tiempos de espera; el Compose no configura proxies externos. Se conserva el límite de memoria del contenedor porque las cargas se procesan por streams de disco.
+
+
+### HTTP 413 y discrepancias entre web y API
+
+La etiqueta `0.2.0` se ha mantenido en varias entregas y no distingue sus capacidades. La barra de progreso pertenece al frontend: no confirma que la API o el proxy tengan el mismo límite.
+
+Abrir `/api/config` en el mismo origen y comprobar `max_upload_bytes`: esta versión informa `4294967296`. Las entregas anteriores pueden no incluir ese campo; su ausencia no permite determinar por sí sola qué límite tienen. Un mensaje JSON que diga «10 MB» indica que la petición alcanza un servidor con el límite antiguo. Un 413 sin JSON puede proceder de un servidor HTTP o un proxy; comprobar la respuesta y comparar el dominio con el acceso directo a `http://IP_DEL_TRUENAS:8890`.
+
+En un despliegue Compose local, desde el directorio del repositorio: `git pull --ff-only`, `docker compose build --pull --no-cache` y `docker compose up -d --force-recreate`. En Apps de TrueNAS, reconstruir desde el contexto Git actual y recrear la aplicación conservando el volumen. Reiniciar el contenedor existente no reconstruye su imagen. Un proxy externo requiere ajustar su propio límite; la aplicación no puede modificarlo.
+
+
+### Construcción coherente de web y backend
+
+La caché de uv para paquetes locales podía reutilizar un wheel antiguo al cambiar solo `backend/`, conservando la versión 0.2.0. El Dockerfile ahora limpia exclusivamente ese paquete antes de instalarlo y `tool.uv.cache-keys` incorpora sus fuentes. Las pruebas de la imagen se ejecutan directamente con el intérprete instalado, sin que `uv run` lo sustituya por una instalación editable; se comparan los archivos Python del wheel con el checkout.
+
+La API directa de la instalación comunicada devolvió HTTP 413 con «El archivo supera los 10 MB.» aunque su web ya tenía progreso: queda confirmado un backend con límite antiguo. La reutilización de caché es una causa compatible, sin acceso para inspeccionar el contenedor remoto. Tras reconstruir, `/api/config` debe informar `max_upload_bytes: 4294967296` y `upload_chunk_bytes: 8388608`.
+
+La web usa ahora peticiones independientes de hasta 8 MiB (`POST /api/uploads`, `PUT /api/uploads/{id}?offset=...`, `POST /api/uploads/{id}/complete?size=...`), para evitar enviar archivos grandes en una sola petición a Cloudflare. El orden y tamaño total se verifican en disco. Cancelar borra la carga temporal; sesiones por bloques abandonadas se limpian al consultar la lista o crear otra carga tras 30 minutos de inactividad. El límite de 1.000 entradas por contenedor sigue vigente.

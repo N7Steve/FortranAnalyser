@@ -123,3 +123,25 @@ Verificaciones: regresiones de formatos y extracción segura, límites escalados
 
 
 Resultado de verificación: 96 pruebas pasan en Windows y una se omite por requerir archivo disperso Linux; las 97 pasan en Docker Linux. Ruff y compilación TypeScript/Vite pasan. Chromium con red limitada valida progreso parcial real, cancelación y subida posterior de 24 MiB, sin errores JavaScript ni desbordamiento a 390 px. No se ha transferido por HTTP un archivo completo de 4 GiB: el límite exacto se verifica con cabeceras, límites escalados y extracción del ZIP disperso de 4 GiB en disco.
+
+
+## Diagnóstico de rechazos de carga (2026-11-12)
+
+- [x] Exponer `max_upload_bytes` en `/api/config` y mostrar el límite comunicado por la API.
+- [x] Distinguir un 413 sin detalle JSON y explicar la comprobación de API frente a proxy.
+- [x] Documentar que la barra de progreso y la etiqueta 0.2.0 no identifican la versión del backend.
+
+Verificación con los dos adjuntos aportados: recepción local HTTP 202 para 129.853.190 y 77.185.588 bytes (extracción sustituida por un comprobador, sin ejecutar el contenido). Ambos TAR superan 1.000 entradas en una inspección acotada; siguen sujetos a los límites de extracción y fuentes. El origen del 413 en el despliegue requiere su URL y/o cabeceras y cuerpo de respuesta; no se ha afirmado corrección del proxy remoto.
+
+
+## Backend instalado y subida mediante Cloudflare (2026-11-12)
+
+- [x] Confirmar respuesta HTTP 413 «10 MB» de Uvicorn en la IP directa aportada: el problema también existe en el backend desplegado.
+- [x] Invalidar caché del paquete local en Docker y rastrear `backend/**` en uv.
+- [x] Ejecutar pruebas sobre el wheel instalado y contrastarlo con las fuentes, sin reinstalación editable implícita.
+- [x] Subida mediante bloques de 8 MiB, offsets estrictos, finalización con tamaño esperado, cancelación y caducidad de reservas abandonadas.
+
+La imagen remota debe reconstruirse y recrearse; no se ha modificado el NAS ni Cloudflare desde esta sesión. La subida completa de ambos adjuntos es aceptada por la API local, pero ambos sobrepasan 1.000 entradas y no se promete análisis completo bajo los límites actuales.
+
+
+Validación: 102 pruebas pasan sobre el paquete instalado en Docker Linux. Recepción local por bloques de los adjuntos reales (129.853.190 bytes en 16 peticiones y 77.185.588 bytes en 10), sustituyendo la extracción por un comprobador. Navegador con red limitada: progreso, cancelación y posterior recepción/análisis de un ZIP sintético de 24 MiB; se observan cuatro peticiones PUT para esa carga. Compilación TypeScript/Vite y Ruff correctos.

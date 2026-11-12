@@ -11,7 +11,11 @@ from test_archive import bundle
 def test_results_and_sources_survive_restart_and_delete_is_durable(tmp_path, monkeypatch):
     monkeypatch.setenv("FORTRAN_DATA_DIR", str(tmp_path))
     with TestClient(create_app()) as client:
-        assert client.get("/api/config").json() == {"persistent": True}
+        assert client.get("/api/config").json() == {
+            "persistent": True,
+            "max_upload_bytes": 4 * 1024**3,
+            "upload_chunk_bytes": 8 * 1024**2,
+        }
         response = upload(client, bundle([("src/p.f90", "program p\nimplicit none\nend\n")]))
         identifier = response.json()["id"]
         assert wait(client, identifier)["status"] == "completed"
