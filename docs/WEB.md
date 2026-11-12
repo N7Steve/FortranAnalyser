@@ -1,8 +1,8 @@
-# Web mínima — fase 2
+# Web de FortranAnalyser
 
 ## Arranque local
 
-Requisitos: Python 3.11 o posterior, uv y Node.js 22.12 o posterior con npm. En la raíz del repositorio:
+Requisitos: Python 3.11 o posterior, uv y Node.js 22.12 o posterior con npm.
 
 ```sh
 uv sync --frozen --extra web --extra dev
@@ -13,108 +13,74 @@ cd ..
 uv run --frozen --extra web python -m fortran_analyser.web
 ```
 
-Abrir **http://127.0.0.1:8000/**. La API sirve la web compilada y sus fuentes tipográficas localmente, sin CDN ni servicios de análisis externos. El botón «Explorar un ejemplo» utiliza tres fuentes sintéticas incluidas con el paquete para mostrar resultados completos y parciales.
+Abrir **http://127.0.0.1:8000/**. La API sirve la web compilada y las fuentes tipográficas sin CDN. «Explorar un ejemplo» incluye fuentes sintéticas completas y parciales. Docker/TrueNAS se documenta en [DEPLOYMENT.md](DEPLOYMENT.md).
 
-El lanzador usa un bucle Selector para el servicio local en Windows, donde también se crean procesos de análisis. Se debe utilizar un único proceso de servidor: la cola y los resultados pertenecen a su memoria.
+## Sin cuotas de procesamiento
 
-Para desarrollar la interfaz con recarga automática, mantener la API anterior y ejecutar en otra terminal:
+Por petición explícita del usuario, no hay topes fijos de:
 
-```sh
-cd frontend
-npm run dev
-```
+- Bytes subidos, tamaño expandido, tamaño por fuente o suma de fuentes.
+- Cantidad de entradas, fuentes, trabajos activos o informes guardados.
+- Duración de subida, extracción o análisis; tampoco caducan las reservas de carga.
+- Tamaño del registro JSON restaurado ni longitud visible de líneas del visor.
 
-Abrir **http://127.0.0.1:5173/**. En desarrollo React consulta directamente la API en el puerto 8000; CORS solo permite los orígenes locales `127.0.0.1:5173` y `localhost:5173`. La versión compilada usa el mismo origen que la API. `FORTRAN_FRONTEND_DIR` permite indicar otro directorio de archivos compilados al arrancar el servidor.
+La web y el motor usan estos valores por defecto. Quien invoque directamente el motor o la consola puede optar por imponer `max_file_bytes`, `max_files` o `timeout` (en consola: `--max-file-bytes`, `--max-files`, `--timeout`). La web no los impone. El Compose no fija cuotas de CPU, RAM ni procesos.
 
-## Recorrido de uso
+Esto no proporciona recursos infinitos: el disco, la RAM, el sistema operativo, el parser y los proxies externos siguen teniendo sus propias restricciones. La extracción y las cargas trabajan en disco; el parser necesita representar cada fuente y su AST en memoria. La cola ejecuta un proyecto cada vez sin rechazar trabajos por su cantidad.
 
-1. Seleccionar o arrastrar un ZIP y elegir formato automático, libre o fijo. Solo se extraen fuentes Fortran; no se ejecutan scripts ni modelos.
-2. Consultar el estado y el avance, o cancelar. El análisis se ejecuta fuera del bucle de atención HTTP, usando el mismo motor de consola y sus procesos limitados por archivo.
-3. Ver resumen de archivos, rutinas, hallazgos y cobertura. Los archivos parciales o fallidos conservan sus estados y no aportan métricas desconocidas.
-4. Filtrar por gravedad o abrir un hallazgo. El explorador muestra árbol de archivos, búsqueda, filtro de estado, ámbitos y código con la línea resaltada.
-5. Exportar el contrato JSON original del motor.
+Se mantienen las comprobaciones de integridad y de rutas: rechazo de navegación `..`, rutas absolutas, componentes ambiguos, duplicados y enlaces/archivos especiales. Solo se escriben fuentes Fortran regulares. Los nombres que se materializan deben ser portables; un directorio de documentación no extraído como `About..` no provoca un fallo por reglas de nombres de Windows. No se ejecuta código ni scripts del proyecto.
 
-El visor representa hasta 200 líneas por página y acorta visualmente las líneas que superan los 1.500 caracteres. El contenido original se conserva en el servidor y las ubicaciones del motor no se modifican. Las métricas cuentan líneas físicas, no solo líneas ejecutables.
+Formatos soportados: ZIP, 7z, TAR y sus compresiones gzip/bzip2/xz, además de fuentes individuales comprimidas. Para estas últimas, el nombre debe conservar la extensión Fortran (por ejemplo, `.f90.gz`). No se añaden RAR, cifrados ni extracción recursiva de comprimidos internos.
+
+## Transferencia y cancelación
+
+La web envía peticiones independientes de 8 MiB para atravesar proxies como Cloudflare. Es un tamaño de transporte, no un máximo de archivo ni una cuota de bloques de la API. La API acepta bloques mayores y los recibe en un temporal en disco, sin acumularlos en memoria. La transferencia comprueba offsets y tamaño final exactos.
+
+Desde 20 MiB se abre un modal con porcentaje y bytes transferidos. El 100 % de transferencia no significa que haya terminado el análisis. Cancelar o pulsar Escape interrumpe la petición y solicita borrar la carga. No hay plazo de caducidad para cargas abandonadas: pueden eliminarse en «Análisis del servidor». Al reiniciar se limpian temporales de carga propios del servidor; los informes terminados se conservan si se usa almacenamiento persistente.
+
+La extracción y el análisis permanecen en procesos separados y permiten cancelación sin imponer una duración máxima. La lista de trabajos e informes sigue accesible después de borrar la caché del navegador. Eliminar un trabajo terminado borra su informe y sus fuentes; no hay borrado automático para liberar plazas.
 
 ## API
 
 | Método y ruta | Resultado |
 | --- | --- |
-| `GET /api/health` | Estado del servicio. |
-| `GET /api/example` | ZIP sintético distribuido con la aplicación. |
-| `POST /api/analyses?name=Proyecto&source_form=auto` | Cuerpo comprimido binario con `Content-Type: application/octet-stream`; devuelve identificador y estado, HTTP 202. No usa multipart. |
-| `GET /api/analyses/{id}` | Estado, archivos procesados, total y error si existe. |
-| `GET /api/analyses/{id}/report` | JSON original, disponible al terminar. `?download=true` lo entrega como descarga. |
-| `GET /api/analyses/{id}/source?path=...` | Fuente UTF-8 de un archivo perteneciente al informe. No permite leer rutas arbitrarias. |
-| `DELETE /api/analyses/{id}` | Cancela un análisis activo (202) o elimina sus resultados temporales si ya terminó (200). |
+| `GET /api/health` | Salud del servicio. |
+| `GET /api/config` | Persistencia, `max_upload_bytes: null` (sin cuota) y `upload_chunk_bytes: 8388608` (tamaño recomendado). |
+| `GET /api/example` | ZIP sintético. |
+| `GET /api/analyses` | Trabajos e informes retenidos. |
+| `POST /api/uploads?name=...&source_form=auto` | Reserva una subida por bloques. |
+| `PUT /api/uploads/{id}?offset=...` | Añade el siguiente bloque y devuelve bytes recibidos. |
+| `POST /api/uploads/{id}/complete?size=...` | Comprueba el tamaño exacto y encola el análisis. |
+| `POST /api/analyses?name=...&source_form=auto` | Alternativa binaria en una sola petición, `application/octet-stream`. |
+| `GET /api/analyses/{id}` | Estado y progreso. |
+| `GET /api/analyses/{id}/report` | Informe JSON; `?download=true` fuerza descarga. |
+| `GET /api/analyses/{id}/report.pdf` | Informe PDF descargable. |
+| `GET /api/analyses/{id}/source?path=...` | Fuente UTF-8 de un archivo del informe. |
+| `DELETE /api/analyses/{id}` | Cancela un trabajo o elimina un informe terminado. |
 
-Estados de trabajo: `uploading`, `queued`, `extracting`, `running`, `completed`, `failed`, `cancelled`. Que el trabajo termine no implica que todas las fuentes se hayan interpretado: sus estados siguen estando en el informe. Un comprimido inválido es un fallo del trabajo, no un informe vacío exitoso.
+El estado de trabajo `completed` no demuestra que todas las fuentes se hayan interpretado: el informe conserva estados completos, parciales, fallidos y omitidos. Los errores de lectura o sintaxis nunca se presentan como ausencia de problemas. El visor pagina las líneas sin truncar su contenido.
 
-## Límites y conservación
+## Resultados, métricas y apariencia
 
-- ZIP, 7z, TAR y compresiones gzip/bzip2/xz de hasta 4 GiB (4.294.967.296 bytes); inactividad de carga limitada a 120 segundos, duración total a 24 horas y descompresión a 30 minutos.
-- Sin límite fijo de cantidad de entradas; 8 GiB descomprimidos totales, 20 MB de fuentes en total y 100 fuentes Fortran de hasta 2 MB cada una.
-- Rechazo de rutas absolutas, navegación `..`, separadores ambiguos, nombres reservados, duplicados sin distinción de mayúsculas, enlaces, archivos especiales y archivos cifrados.
-- Un trabajador, hasta tres trabajos activos/en cola y ocho análisis retenidos por proceso. Las fuentes se analizan secuencialmente con un máximo de cinco segundos por archivo.
-- Los archivos de un trabajo inválido o cancelado se limpian; los terminados se conservan en un directorio temporal privado hasta su eliminación o parada del servidor.
-- El navegador recuerda el identificador del último trabajo en su pestaña para recuperarlo al recargar. Un nuevo análisis sustituye al anterior. El arranque local sin `FORTRAN_DATA_DIR` es temporal. La fase 3 añade persistencia opcional, activada en Docker; ver [despliegue](DEPLOYMENT.md).
+El grafo muestra módulos, rutinas, tipos derivados, USE, CALL explícito, pertenencia, herencia y referencias a tipos. Las relaciones externas o ambiguas quedan sin resolver. No reconstruye despacho dinámico, genéricos, renombrados USE ni llamadas en expresiones.
 
-Es una aplicación personal, sin autenticación ni separación entre usuarios, no un servicio público de subida de código. Los límites de lectura y tiempo no son una cuota estricta de memoria ni un sandbox completo. El despliegue de la fase 3 configura almacenamiento y acceso por la red local.
+La CC estructural cuenta una base por unidad ejecutable y decisiones IF, ELSE IF, DO con control, CASE no DEFAULT, WHERE y FORALL. No se deduce del grafo de dependencias ni representa un CFG completo. Se agrega por rutina, archivo y proyecto, con cobertura parcial visible.
+
+La nota orientativa 0–10 es `6 × proporción de ámbitos con IMPLICIT NONE + 2 si profundidad de bucles ≤ 3 + 1 si hay EXIT + 1 si hay CYCLE`. Los bonus se conceden una vez por archivo sobre instrucciones AST. La nota global es la media de archivos y no se emite si hay resultados parciales o fallidos. No es una validación científica ni una reproducción de las once métricas Java.
+
+El PDF incluye resultados, estados, métodos, métricas, hallazgos localizados, diagramas y relaciones. La firma virtual es un sello visual, acompañado del SHA-256 del JSON canónico (`json.dumps(report, sort_keys=True, ensure_ascii=True)` en UTF-8), sin certificado digital.
+
+Temas Moderno, Original y Clásico naranja, todos con modo claro/oscuro y preferencias locales. El icono original procede de `fortranAnalyserIcon.png`, de Michael García Rodríguez, bajo la licencia GPL del repositorio. `reference/` sigue ignorado y sin modificaciones. Los informes anteriores necesitan un nuevo análisis para incorporar las métricas nuevas.
 
 ## Comprobaciones
 
 ```sh
 uv run --frozen --extra web --extra dev python -m pytest -q
-uv run --frozen --extra web --extra dev ruff check .
-uv run --frozen --extra web --extra dev ruff format --check .
+uv run --frozen --extra web --extra dev ruff check backend tests
+uv run --frozen --extra web --extra dev ruff format --check backend tests
 cd frontend
-npm run format:check
 npm run build
+npm run format:check
 ```
 
-Las pruebas cubren extracción segura y límites, carga real del ejemplo, estados y errores, descarga, lectura de fuentes autorizadas, cancelación, limpieza y respuesta de la API mientras un trabajo está ocupado. TypeScript verifica la interfaz y Vite construye los recursos. El recorrido de navegador se contrasta con la API real, no con datos simulados.
-
-
-## Apariencia y explicación de la migración
-
-El botón **Ajustes** de la barra superior permite combinar dos estilos (**Moderno** y **Original**) con modo **Claro** u **Oscuro**. El estilo Original recupera el azul RGB 61, 143, 199 y los paneles grises de `MainWindow.java`; es una adaptación web, no una reproducción de Swing. La primera visita toma el modo del dispositivo; las elecciones posteriores se guardan en `localStorage` del navegador. Si el almacenamiento está bloqueado, la elección sigue funcionando durante la sesión y el menú informa de ello.
-
-El menú usa un diálogo nativo: mantiene el foco dentro, se cierra con Escape y devuelve el foco al botón de ajustes. Los grupos de opciones funcionan con teclado. Las transiciones de botones y barras y las animaciones de entrada respetan `prefers-reduced-motion`; el salto del visor también evita el desplazamiento suave con esa preferencia.
-
-La navegación **La migración**, disponible incluso sin cargar un proyecto, explica la autoría original, la comparación Java/Swing/Maven con Python/fparser2/FastAPI/React/Vite/Docker, las correcciones comprobadas y las capacidades que siguen pendientes. No requiere ni sirve los archivos de `reference/`. Cambiar de sección mantiene el informe y el trabajo en curso.
-
-
-## Estructura, nota e informe PDF
-
-El resumen muestra el grafo de módulos, rutinas y tipos derivados (las clases de Fortran), las dependencias USE/CALL, pertenencia, herencia y referencias a tipos. La tabla de relaciones incluye ubicación y destinos no resueltos. Las referencias a tipos no implican propiedad del objeto. El grafo de dependencias no es un grafo de flujo de control.
-
-La CC estructural cuenta una base por programa/subrutina/función y una decisión por IF, ELSE IF, DO con control, CASE no DEFAULT, WHERE o FORALL. No cuenta operadores booleanos ni EXIT/CYCLE como decisiones. No reconstruye un CFG completo (por ejemplo, GOTO aritmético y saltos no estructurados quedan fuera). Se suman las rutinas por archivo y los archivos completos por proyecto, indicando cobertura parcial si corresponde. Un archivo completo sin unidades ejecutables tiene CC 0.
-
-Perfil orientativo 0–10: `6 × fracción de ámbitos con IMPLICIT NONE + 2 si profundidad de bucles ≤ 3 + 1 si hay EXIT + 1 si hay CYCLE`. Los bonus se otorgan una vez por archivo, solo sobre instrucciones AST; cadenas y comentarios no puntúan. La nota global es la media por archivo y no se emite si hay fuentes parciales, fallidas u omitidas. No sustituye la revisión de corrección científica ni reproduce la puntuación Java.
-
-«Descargar PDF» llama a `GET /api/analyses/{id}/report.pdf`. Incluye resumen, cobertura, métodos, diagrama, lista completa de relaciones, CC por rutina/archivo/proyecto, notas, métricas y hallazgos localizados. El sello virtual de FortranAnalyser es visual y acompaña una huella SHA-256 del JSON canónico (`json.dumps(report, sort_keys=True, ensure_ascii=True)` codificado UTF-8); no es una firma con certificado. Los informes guardados antes de esta versión necesitan un nuevo análisis para disponer de las métricas nuevas.
-
-Formatos soportados: ZIP, 7z, TAR, TAR.GZ/TGZ, TAR.BZ2/TBZ2, TAR.XZ/TXZ y fuentes individuales `.f90.gz` (también bzip2/xz y otras extensiones Fortran). La detección usa el contenido, no la extensión. Para fuentes individuales, enviar el nombre completo en `name`. No se admiten RAR, cifrados, multipartes ni extracción recursiva de comprimidos internos.
-
-El icono `frontend/public/original-icon.png` procede de `fortranAnalyserIcon.png`, del proyecto original de Michael García Rodríguez, bajo la licencia GPL del repositorio. La copia local `reference/` permanece ignorada y sin cambios.
-
-
-## Mensaje de capacidad y recuperación de informes
-
-«Análisis del servidor» lista los análisis retenidos, aunque se haya borrado la caché o se abra otra pestaña. Permite abrir un informe terminado, ver el estado de otro trabajo, cancelar trabajos activos y eliminar informes y fuentes de trabajos terminados. La lista se actualiza mientras hay trabajos activos y también dispone de un botón de actualización manual.
-
-Se distinguen dos límites: tres trabajos activos (esperar o cancelar uno) y ocho análisis retenidos (eliminar uno terminado). Los informes no se eliminan automáticamente para admitir cargas nuevas. Borrar la caché del navegador o reiniciar un servidor persistente no libera los registros guardados.
-
-
-## Cargas grandes
-
-La API escribe los bloques recibidos directamente en un archivo temporal del volumen de análisis. La cola y el proceso de extracción reciben la ruta, sin copiar el comprimido completo a RAM ni al tmpfs `/tmp`. La carga se elimina al terminar, fallar o cancelarse; un reinicio limpia cargas temporales abandonadas con nombres propios del servidor.
-
-Desde 20 MiB, la web abre un modal con progreso real de transferencia mediante XMLHttpRequest: porcentaje, MiB enviados, espera de confirmación y cancelación (también con Escape). El 100 % indica transferencia enviada; la descompresión y el análisis se muestran después por separado. Una desconexión o cancelación puede tardar hasta 120 segundos en liberar la carga en el servidor.
-
-Se aceptan 4 GiB de comprimido y hasta 8 GiB de contenido expandido. No hay límite fijo de entradas del contenedor. Siguen vigentes 100 fuentes Fortran, 2 MB por fuente y 20 MB de fuentes en conjunto. Los contenedores TAR comprimidos se expanden en un temporal de disco; ZIP solo escribe fuentes y 7z descarta los miembros no utilizados. Se necesitan hasta unos 20 GiB libres para tres cargas máximas y una expansión TAR en curso, además de los informes retenidos. El volumen debe disponer de ese espacio: aumentar la subida no amplía el almacenamiento físico.
-
-Si hay un proxy inverso delante, configurar también su límite de cuerpo a al menos 4 GiB y permitir peticiones de larga duración; un rechazo del proxy no llega a esta API. El acceso directo al puerto 8890 evita ese límite adicional.
-
-
-La web actual divide la transferencia en peticiones de hasta 8 MiB, negociadas mediante `upload_chunk_bytes` en `/api/config`. Usa `POST /api/uploads` para reservar la carga, `PUT /api/uploads/{id}?offset=...` para cada bloque y `POST /api/uploads/{id}/complete?size=...` para finalizar. Los offsets deben coincidir con los bytes guardados y la finalización exige el tamaño exacto. El endpoint de carga binaria original sigue disponible para clientes directos. Una API que no anuncie la capacidad por bloques necesita reconstrucción antes de usar la web actual. Las reservas por bloques caducan tras 30 minutos sin actividad y se limpian al listar o crear trabajos; la cancelación desde la web solicita su eliminación inmediata.
+La etapa Docker `test` prueba el paquete instalado y lo compara con las fuentes. No requiere ejecutar los proyectos subidos.

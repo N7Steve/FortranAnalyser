@@ -13,7 +13,7 @@ def test_results_and_sources_survive_restart_and_delete_is_durable(tmp_path, mon
     with TestClient(create_app()) as client:
         assert client.get("/api/config").json() == {
             "persistent": True,
-            "max_upload_bytes": 4 * 1024**3,
+            "max_upload_bytes": None,
             "upload_chunk_bytes": 8 * 1024**2,
         }
         response = upload(client, bundle([("src/p.f90", "program p\nimplicit none\nend\n")]))
@@ -93,11 +93,9 @@ def test_configurable_nas_hostname_still_rejects_unknown_hosts(monkeypatch):
 
 
 def test_full_persistent_store_can_be_managed_after_losing_browser_session(tmp_path):
-    import pytest
-
     store = JobStore(tmp_path, persistent=True)
     try:
-        for i in range(8):
+        for i in range(12):
             job = store.create(f"Saved {i}", "auto")
             job.status = "failed"
             job.error = "Invalid archive"
@@ -106,13 +104,25 @@ def test_full_persistent_store_can_be_managed_after_losing_browser_session(tmp_p
         store.close()
     restored = JobStore(tmp_path, persistent=True)
     try:
-        assert len(restored.jobs) == 8
-        with pytest.raises(ValueError, match="ocho análisis guardados"):
-            restored.create("New", "auto")
+        assert len(restored.jobs) == 12
         previous = next(iter(restored.jobs))
         assert restored.delete(previous)
         assert not (tmp_path / previous).exists()
         assert restored.create("New", "auto").status == "uploading"
-        assert len(restored.jobs) == 8
+        assert len(restored.jobs) == 12
+    finally:
+        restored.close()
+
+
+def test_persistent_record_above_previous_32_mb_limit_is_restored(tmp_path):
+    store = JobStore(tmp_path, persistent=True)
+    job = store.create("Large result", "auto")
+    job.status = "failed"
+    job.error = "x" * 32_000_001
+    store._save(job)
+    store.close()
+    restored = JobStore(tmp_path, persistent=True)
+    try:
+        assert len(restored.get(job.id).error) == 32_000_001
     finally:
         restored.close()

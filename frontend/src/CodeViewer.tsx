@@ -44,8 +44,7 @@ export default function CodeViewer({ id, path, line }: { id: string; path: strin
   const visible = useMemo(
     () =>
       lines.slice(start, start + PAGE_SIZE).map((text) => ({
-        html: hljs.highlight(text.slice(0, 1500), { language: 'fortran' }).value,
-        truncated: text.length > 1500,
+        html: hljs.highlight(text, { language: 'fortran' }).value,
       })),
     [lines, start],
   )
@@ -81,7 +80,6 @@ export default function CodeViewer({ id, path, line }: { id: string; path: strin
             >
               <span className="line-number">{number}</span>
               <code dangerouslySetInnerHTML={{ __html: item.html || ' ' }} />
-              {item.truncated && <span className="muted"> … línea truncada en el visor</span>}
             </div>
           )
         })}

@@ -1,8 +1,9 @@
-"""Local file discovery and per-file process isolation with resource limits."""
+"""Local file discovery and process isolation; quotas are opt-in for API/CLI callers."""
 
 import math
 import multiprocessing
 import os
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -32,15 +33,23 @@ def _worker(connection, source, path, form):
         connection.close()
 
 
-def _bounded_analysis(source, path, form, timeout):
+def _bounded_analysis(source, path, form, timeout, should_cancel=None):
     context = multiprocessing.get_context("spawn")
     receive, send = context.Pipe(duplex=False)
     process = context.Process(target=_worker, args=(send, source, path, form))
     try:
+        if should_cancel and should_cancel():
+            raise ValueError("Análisis cancelado.")
         process.start()
         send.close()
-        if not receive.poll(timeout):
-            return _failure(path, form, "FA105", f"Análisis interrumpido: límite de {timeout:g} s.")
+        started = time.monotonic()
+        while not receive.poll(0.2 if timeout is None else min(0.2, timeout)):
+            if should_cancel and should_cancel():
+                raise ValueError("Análisis cancelado.")
+            if timeout is not None and time.monotonic() - started >= timeout:
+                return _failure(
+                    path, form, "FA105", f"Análisis interrumpido: límite de {timeout:g} s."
+                )
         try:
             return receive.recv()
         except EOFError:
@@ -83,9 +92,9 @@ def analyse_project(
     root: str | Path,
     *,
     source_form: str = "auto",
-    max_file_bytes: int = 2_000_000,
-    max_files: int = 500,
-    timeout: float = 10,
+    max_file_bytes: int | None = None,
+    max_files: int | None = None,
+    timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
 ) -> ProjectResult:
@@ -96,13 +105,17 @@ def analyse_project(
     """
     if source_form not in {"auto", "fixed", "free"}:
         raise ValueError("Formato esperado: auto, fixed o free.")
-    if max_file_bytes <= 0 or max_files <= 0 or not math.isfinite(timeout) or timeout <= 0:
+    if (
+        (max_file_bytes is not None and max_file_bytes <= 0)
+        or (max_files is not None and max_files <= 0)
+        or (timeout is not None and (not math.isfinite(timeout) or timeout <= 0))
+    ):
         raise ValueError("Los límites deben ser positivos y el tiempo finito.")
     root = Path(root).absolute()
     paths = []
     for path in _discover(root):
         paths.append(path)
-        if len(paths) > max_files:
+        if max_files is not None and len(paths) > max_files:
             raise ValueError(f"El proyecto supera el límite de {max_files} archivos Fortran.")
     if not paths:
         raise ValueError("No se encontraron archivos Fortran compatibles.")
@@ -138,8 +151,8 @@ def analyse_project(
         try:
             # Bounded read even if a file grows between discovery and opening.
             with path.open("rb") as stream:
-                data = stream.read(max_file_bytes + 1)
-            if len(data) > max_file_bytes:
+                data = stream.read() if max_file_bytes is None else stream.read(max_file_bytes + 1)
+            if max_file_bytes is not None and len(data) > max_file_bytes:
                 results.append(
                     _failure(
                         relative, form, "FA106", "Archivo superior al límite de tamaño.", "skipped"
@@ -150,7 +163,10 @@ def analyse_project(
         except (OSError, UnicodeError) as exc:
             results.append(_failure(relative, form, "FA107", f"No se pudo leer como UTF-8: {exc}"))
             continue
-        results.append(_bounded_analysis(source, relative, form, timeout))
+        if should_cancel:
+            results.append(_bounded_analysis(source, relative, form, timeout, should_cancel))
+        else:
+            results.append(_bounded_analysis(source, relative, form, timeout))
         if on_progress:
             on_progress(len(results), len(paths))
     if on_progress:

@@ -54,7 +54,7 @@ En archivos parciales no se publican métricas AST: `metrics` es `null` y `scope
 
 El formato fijo sigue el lector estándar de fparser, incluida su interpretación de columnas; no se habilitan extensiones de longitud de línea. No se promete soporte completo de Fortran 2008/2018, OpenMP, extensiones de compilador, `ENTRY`, resolución de símbolos o semántica entre archivos. Las directivas OpenMP en comentarios no activan una configuración de compilación.
 
-Solo se decodifica UTF-8 (con o sin BOM). La búsqueda excluye `.git`, `.venv`, `venv`, `node_modules`, `reference` y `__pycache__` y no recorre directorios simbólicos. Cada fuente se procesa secuencialmente en un proceso nuevo con tiempo limitado. Hay límite de archivos y tamaño de lectura, pero no una cuota estricta de memoria ni límite global de duración; el aislamiento de entradas de usuarios pertenece a la fase web.
+Solo se decodifica UTF-8 (con o sin BOM). La búsqueda excluye `.git`, `.venv`, `venv`, `node_modules`, `reference` y `__pycache__` y no recorre directorios simbólicos. Cada fuente se procesa secuencialmente en un proceso nuevo, sin máximo predeterminado de duración, cantidad de fuentes ni tamaño de lectura. Los llamantes del motor o de la consola pueden imponer límites opcionales explícitos. La web no los impone y conserva cancelación y validación de rutas; el aislamiento de procesos no proporciona recursos físicos ilimitados.
 
 ## Siguiente validación
 

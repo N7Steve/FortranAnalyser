@@ -40,7 +40,7 @@ El proyecto de ejemplo devuelve 2 archivos analizados y 1 aviso por ausencia de 
 
 La salida incluye versiones de esquema, reglas y parser; por archivo, estado, formato, líneas, métricas, ámbitos y hallazgos con ubicación. Las métricas desconocidas son `null`. Los códigos de salida son `0` si todos los archivos pudieron analizarse (aunque tengan avisos), `1` si alguno es parcial, fallido u omitido y `2` si hay un error de entrada, límites de proyecto o escritura de salida.
 
-Límites predeterminados: 500 archivos, 2 MB por archivo y 10 segundos de análisis por archivo, configurable con `--max-files`, `--max-file-bytes` y `--timeout`. La consola procesa proyectos locales de confianza; no es aún un servicio de carga de archivos ni un aislamiento para entradas hostiles.
+No hay cuotas predeterminadas de cantidad de archivos, tamaño o duración. La consola permite imponerlas explícitamente con `--max-files`, `--max-file-bytes` y `--timeout`. La web tampoco impone cuotas de subida, extracción, análisis o informes; siguen vigentes las validaciones de rutas y los recursos físicos del servidor.
 
 ## Verificación
 

@@ -65,10 +65,10 @@ export default function AnalysisHistory({
 
   return (
     <details className="analysis-history">
-      <summary>Análisis del servidor ({jobs.length} / 8)</summary>
+      <summary>Análisis del servidor ({jobs.length})</summary>
       <p>
-        Los análisis se guardan en el servidor. Borrar la caché del navegador no libera plazas. Se
-        permiten tres trabajos activos. Eliminar un análisis borra su informe y sus fuentes.
+        Los análisis se guardan en el servidor. No hay cuotas de cantidad de trabajos o informes.
+        Eliminar un análisis borra su informe y sus fuentes.
       </p>
       <button
         className="button secondary"

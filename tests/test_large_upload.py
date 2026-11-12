@@ -7,49 +7,34 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from fortran_analyser.api import create_app
-from fortran_analyser.archive import MAX_UPLOAD, extract_sources
+from fortran_analyser.archive import extract_sources
 from fortran_analyser.jobs import JobStore
 from test_api import wait
 from test_archive import bundle
 
 
-def test_limit_is_four_gib_and_excess_length_is_rejected_without_reserving_slot():
-    assert MAX_UPLOAD == 4 * 1024**3
+def test_no_upload_maximum_is_reported():
+    with TestClient(create_app()) as client:
+        assert client.get("/api/config").json()["max_upload_bytes"] is None
+
+
+@pytest.mark.parametrize("length", [32, 33])
+def test_streamed_upload_without_content_length_has_no_quota(length):
     with TestClient(create_app()) as client:
         response = client.post(
             "/api/analyses",
-            content=b"",
-            headers={
-                "Content-Type": "application/octet-stream",
-                "Content-Length": str(MAX_UPLOAD + 1),
-            },
-        )
-        assert response.status_code == 413
-        assert not client.app.state.store.jobs
-        assert not list(client.app.state.store.root.glob("*.upload"))
-
-
-@pytest.mark.parametrize("extra,expected", [(0, 202), (1, 413)])
-def test_chunked_boundary_without_content_length(monkeypatch, extra, expected):
-    monkeypatch.setattr("fortran_analyser.api.MAX_UPLOAD", 32)
-    with TestClient(create_app()) as client:
-        response = client.post(
-            "/api/analyses",
-            content=iter([b"x" * 16, b"x" * (16 + extra)]),
+            content=iter([b"x" * length]),
             headers={"Content-Type": "application/octet-stream"},
         )
-        assert response.status_code == expected
-        if expected == 202:
-            assert wait(client, response.json()["id"])["status"] == "failed"
-        else:
-            assert not client.app.state.store.jobs
+        assert response.status_code == 202
+        assert wait(client, response.json()["id"])["status"] == "failed"
         assert not list(client.app.state.store.root.glob("*.upload"))
 
 
 def test_large_upload_is_queued_as_disk_path_and_cleaned():
     seen = []
 
-    def inspect_upload(data, destination, filename):
+    def inspect_upload(data, destination, filename, should_cancel=None):
         assert isinstance(data, Path)
         assert data.stat().st_size == 32 * 1024**2
         seen.append(data)
@@ -94,14 +79,10 @@ def test_real_four_gib_archive_on_disk(tmp_path):
     payload = bundle([("p.f90", "program p\nend")])
     archive = tmp_path / "large.zip"
     with archive.open("wb") as stream:
-        stream.seek(MAX_UPLOAD - len(payload))
+        stream.seek(4 * 1024**3 + 1 - len(payload))
         stream.write(payload)
     destination = tmp_path / "sources"
     destination.mkdir()
-    assert archive.stat().st_size == MAX_UPLOAD
+    assert archive.stat().st_size == 4 * 1024**3 + 1
     assert extract_sources(archive, destination) == 1
-    with archive.open("ab") as stream:
-        stream.write(b"x")
-    with pytest.raises(ValueError, match="4 GiB"):
-        extract_sources(archive, destination)
     archive.unlink()

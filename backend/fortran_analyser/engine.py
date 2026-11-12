@@ -181,7 +181,7 @@ def _extract(tree, path: str, physical_lines: int) -> FileResult:
 
 
 def analyse_source(source: str, *, path: str = "<memory>", source_form: str = "free") -> FileResult:
-    """Analyse one decoded source. For bounded execution use analyse_project().
+    """Analyse one decoded source. For process isolation use analyse_project().
 
     Parses syntax, not compiler semantics. Partial files expose no AST metrics.
     """

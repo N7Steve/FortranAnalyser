@@ -53,8 +53,8 @@ function uploadBlock<T>(
         reject(
           new ApiError(
             typeof body?.detail === 'string'
-              ? xhr.status === 413 && file.size <= 4 * 1024 ** 3
-                ? `${body.detail} El archivo está dentro de los 4 GiB permitidos por esta web. Comprueba que la API esté reconstruida y que el proxy permita ese tamaño.`
+              ? xhr.status === 413
+                ? `${body.detail} Esta web no impone un límite de tamaño. Comprueba que la API esté reconstruida y que el proxy permita ese tamaño.`
                 : body.detail
               : xhr.status === 413
                 ? 'HTTP 413 sin detalle de la API: el servidor HTTP o un proxy ha rechazado el tamaño. Prueba el acceso directo al puerto 8890 y revisa el límite del proxy.'
@@ -113,7 +113,6 @@ export async function uploadArchive<T>(
     // Cleanup uses its own request: the transfer's AbortSignal may already be cancelled.
     await request(`/api/analyses/${job.id}`, {
       method: 'DELETE',
-      signal: AbortSignal.timeout(10000),
     }).catch(() => {})
     throw error
   }

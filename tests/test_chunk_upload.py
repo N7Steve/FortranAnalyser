@@ -28,15 +28,14 @@ def test_chunked_upload_reassembles_and_analyses():
         assert client.post(f"/api/uploads/{identifier}/complete?size=1").status_code == 409
 
 
-def test_cancel_order_limits_and_incomplete_finalize(monkeypatch):
-    monkeypatch.setattr("fortran_analyser.api.MAX_UPLOAD", 16)
+def test_cancel_order_and_incomplete_finalize():
     with TestClient(create_app()) as client:
         identifier = start(client)
         url = f"/api/uploads/{identifier}"
         assert client.put(url + "?offset=0", content=b"test").status_code == 200
         assert client.put(url + "?offset=0", content=b"repeat").status_code == 409
-        assert client.put(url + "?offset=4", content=b"x" * 13).status_code == 413
-        assert client.put(url + "?offset=4", content=b"x" * (8 * 1024**2 + 1)).status_code == 413
+        assert client.put(url + "?offset=4", content=b"x" * 13).status_code == 200
+        assert client.put(url + "?offset=17", content=b"x" * (8 * 1024**2 + 1)).status_code == 200
         assert client.post(url + "/complete?size=5").status_code == 409
         assert client.delete(f"/api/analyses/{identifier}").json()["deleted"]
         assert client.put(url + "?offset=4", content=b"x").status_code == 404
@@ -44,18 +43,19 @@ def test_cancel_order_limits_and_incomplete_finalize(monkeypatch):
         assert not client.app.state.store.jobs
 
 
-def test_abandoned_chunk_session_expires_and_frees_capacity():
+def test_upload_is_retained_without_automatic_deadline():
     with TestClient(create_app()) as client:
         identifier = start(client)
         client.app.state.store.jobs[identifier].last_activity -= 1801
-        assert client.get("/api/analyses").json() == []
+        assert client.get("/api/analyses").json()[0]["id"] == identifier
+        assert client.delete(f"/api/analyses/{identifier}").status_code == 200
         assert not list(client.app.state.store.root.glob("*.upload"))
 
 
 def test_proxy_sized_requests_accept_a_larger_total():
     data = b"x" * (24 * 1024**2 + 7)
 
-    def verify(path, destination, filename):
+    def verify(path, destination, filename, should_cancel=None):
         assert isinstance(path, Path)
         assert path.read_bytes() == data
         raise ValueError("Reception verified")

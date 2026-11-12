@@ -1,3 +1,5 @@
+> Estado actual: no hay cuotas de subida, extracción, fuentes, duración, cola o informes en la aplicación. Los Compose tampoco fijan cuotas de CPU/RAM/procesos. La web sigue enviando bloques de 8 MiB por compatibilidad con proxies; esto no limita el tamaño total. `/api/config` anuncia `max_upload_bytes: null`. Los valores numéricos de límites en las notas de diagnóstico siguientes describen versiones anteriores. Véase [comportamiento actual](WEB.md).
+
 # Docker y TrueNAS
 
 La imagen incluye Python, motor, API y web compilada con tipografías locales. Node y uv solo se usan durante la construcción. La referencia Java, los datos y las herramientas de desarrollo no forman parte de la imagen final.
@@ -22,7 +24,7 @@ El volumen `analyses` está montado en `/data`. Conserva fuentes extraídas, met
 
 Para usar un dataset propio, crear por ejemplo `/mnt/TU_POOL/apps/fortran-analyser`, conceder lectura/escritura al UID/GID **568:568** y sustituir `analyses:/data` por el bloque de montaje comentado en el YAML. `create_host_path: false` impide crear silenciosamente una ruta incorrecta. No cambiar recursivamente los permisos de un dataset compartido con otras aplicaciones.
 
-El proceso arranca como 568:568, con raíz de solo lectura. Escribe en `/data` y en áreas temporales del contenedor; `/tmp` está limitado a 128 MB. La imagen prepara los permisos del volumen Docker, pero no modifica los de un dataset del NAS. Si falta permiso, el servicio falla al arrancar.
+El proceso arranca como 568:568, con raíz de solo lectura. Escribe en `/data` y en áreas temporales del contenedor; `/tmp` usa tmpfs sin un tamaño fijo configurado por el Compose. La imagen prepara los permisos del volumen Docker, pero no modifica los de un dataset del NAS. Si falta permiso, el servicio falla al arrancar.
 
 Cada identificador reside en `/data/analyses/{id}` y contiene un `.analysis.json` con escritura mediante reemplazo atómico. Se restauran resultados al reiniciar. Trabajos interrumpidos se marcan fallidos y sus fuentes incompletas se limpian, sin reejecución automática. Registros corruptos o ajenos se ignoran y no se borran.
 
@@ -38,7 +40,7 @@ La API `GET /api/analyses` lista los identificadores conservados; `DELETE /api/a
 | `FORTRAN_DATA_DIR` | `/data` | Activa persistencia. Sin esta variable, el arranque local usa datos temporales. |
 | `FORTRAN_FRONTEND_DIR` | `/app/frontend` | Web compilada incluida en la imagen. |
 
-El YAML establece 512 MB de RAM, dos CPU y 128 procesos; ajustar según los modelos reales. Mantener **una instancia y un trabajador HTTP** por directorio de datos. Los límites de carga de la fase 2 siguen vigentes.
+El YAML no fija cuotas de RAM, CPU ni procesos. Mantener **una instancia y un trabajador HTTP** por directorio de datos. La aplicación no impone cuotas de carga o análisis.
 
 La aplicación es para una red de confianza, sin cuentas ni separación entre usuarios: el puerto publicado da acceso a las fuentes e informes. Para acceso desde Internet haría falta autenticación y HTTPS, no incluidos en este despliegue.
 
@@ -83,14 +85,14 @@ La etapa `test` ejecuta las pruebas Python en Linux, sin añadir sus dependencia
 
 ### Espacio para cargas grandes
 
-La subida máxima es de 4 GiB. Los comprimidos y temporales de descompresión se escriben en el volumen de análisis, no en `/tmp`. Para tres cargas máximas y una expansión TAR de hasta 8 GiB, reservar al menos 20 GiB libres adicionales a los análisis guardados. Si se usa un proxy inverso, aumentar también su límite de cuerpo a 4 GiB y sus tiempos de espera; el Compose no configura proxies externos. Se conserva el límite de memoria del contenedor porque las cargas se procesan por streams de disco.
+No hay un máximo de subida o expansión en la aplicación. Los comprimidos y temporales se guardan en el volumen de análisis. El espacio requerido depende del tamaño del archivo, su contenido expandido, las cargas en cola y los informes retenidos. El Compose no limita la memoria o CPU. Los proxies externos mantienen sus propias restricciones; la web envía bloques de 8 MiB para reducir el tamaño de cada petición sin limitar el archivo completo.
 
 
 ### HTTP 413 y discrepancias entre web y API
 
 La etiqueta `0.2.0` se ha mantenido en varias entregas y no distingue sus capacidades. La barra de progreso pertenece al frontend: no confirma que la API o el proxy tengan el mismo límite.
 
-Abrir `/api/config` en el mismo origen y comprobar `max_upload_bytes`: esta versión informa `4294967296`. Las entregas anteriores pueden no incluir ese campo; su ausencia no permite determinar por sí sola qué límite tienen. Un mensaje JSON que diga «10 MB» indica que la petición alcanza un servidor con el límite antiguo. Un 413 sin JSON puede proceder de un servidor HTTP o un proxy; comprobar la respuesta y comparar el dominio con el acceso directo a `http://IP_DEL_TRUENAS:8890`.
+Abrir `/api/config` en el mismo origen y comprobar `max_upload_bytes`: esta versión informa `null` (sin cuota). Las entregas anteriores pueden no incluir ese campo; su ausencia no permite determinar por sí sola qué límite tienen. Un mensaje JSON que diga «10 MB» indica que la petición alcanza un servidor con el límite antiguo. Un 413 sin JSON puede proceder de un servidor HTTP o un proxy; comprobar la respuesta y comparar el dominio con el acceso directo a `http://IP_DEL_TRUENAS:8890`.
 
 En un despliegue Compose local, desde el directorio del repositorio: `git pull --ff-only`, `docker compose build --pull --no-cache` y `docker compose up -d --force-recreate`. En Apps de TrueNAS, reconstruir desde el contexto Git actual y recrear la aplicación conservando el volumen. Reiniciar el contenedor existente no reconstruye su imagen. Un proxy externo requiere ajustar su propio límite; la aplicación no puede modificarlo.
 
@@ -99,6 +101,6 @@ En un despliegue Compose local, desde el directorio del repositorio: `git pull -
 
 La caché de uv para paquetes locales podía reutilizar un wheel antiguo al cambiar solo `backend/`, conservando la versión 0.2.0. El Dockerfile ahora limpia exclusivamente ese paquete antes de instalarlo y `tool.uv.cache-keys` incorpora sus fuentes. Las pruebas de la imagen se ejecutan directamente con el intérprete instalado, sin que `uv run` lo sustituya por una instalación editable; se comparan los archivos Python del wheel con el checkout.
 
-La API directa de la instalación comunicada devolvió HTTP 413 con «El archivo supera los 10 MB.» aunque su web ya tenía progreso: queda confirmado un backend con límite antiguo. La reutilización de caché es una causa compatible, sin acceso para inspeccionar el contenedor remoto. Tras reconstruir, `/api/config` debe informar `max_upload_bytes: 4294967296` y `upload_chunk_bytes: 8388608`.
+La API directa de la instalación comunicada devolvió HTTP 413 con «El archivo supera los 10 MB.» aunque su web ya tenía progreso: queda confirmado un backend con límite antiguo. La reutilización de caché es una causa compatible, sin acceso para inspeccionar el contenedor remoto. Tras reconstruir, `/api/config` debe informar `max_upload_bytes: null` y `upload_chunk_bytes: 8388608`.
 
-La web usa ahora peticiones independientes de hasta 8 MiB (`POST /api/uploads`, `PUT /api/uploads/{id}?offset=...`, `POST /api/uploads/{id}/complete?size=...`), para evitar enviar archivos grandes en una sola petición a Cloudflare. El orden y tamaño total se verifican en disco. Cancelar borra la carga temporal; sesiones por bloques abandonadas se limpian al consultar la lista o crear otra carga tras 30 minutos de inactividad. No hay límite fijo de entradas por contenedor; se mantienen las cotas de bytes, tiempo y fuentes Fortran.
+La web usa ahora peticiones independientes de hasta 8 MiB (`POST /api/uploads`, `PUT /api/uploads/{id}?offset=...`, `POST /api/uploads/{id}/complete?size=...`), para evitar enviar archivos grandes en una sola petición a Cloudflare. El orden y tamaño total se verifican en disco. Cancelar borra la carga temporal; no hay caducidad automática de reservas por tiempo. Las cargas abandonadas pueden eliminarse desde la lista de análisis. No hay cuotas de tamaño de archivo, cantidad de entradas o fuentes ni duración de análisis.

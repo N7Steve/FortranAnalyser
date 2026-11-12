@@ -75,15 +75,14 @@ def test_bad_zip_becomes_visible_failure_and_cleans_files(client):
     assert client.get(f"/api/analyses/{identifier}/report").status_code == 409
 
 
-def test_upload_limit_and_media_type_release_reserved_slot(client, monkeypatch):
-    monkeypatch.setattr("fortran_analyser.api.MAX_UPLOAD", 10_000_000)
+def test_upload_above_previous_ten_mb_limit_and_media_type(client):
     assert client.post("/api/analyses", content="text").status_code == 415
-    for _ in range(4):
-        assert upload(client, b"x" * 10_000_001).status_code == 413
-    assert not client.app.state.store.jobs
+    identifier = upload(client, b"x" * 10_000_001).json()["id"]
+    assert wait(client, identifier)["status"] == "failed"
+    assert not list(client.app.state.store.root.glob("*.upload"))
 
 
-def test_api_remains_responsive_and_queue_is_bounded(client):
+def test_api_remains_responsive_and_queue_has_no_admission_quota(client):
     entered = threading.Event()
     release = threading.Event()
 
@@ -101,7 +100,7 @@ def test_api_remains_responsive_and_queue_is_bounded(client):
             assert client.get(f"/api/analyses/{first}").json()["status"] == "running"
             assert upload(client, data).status_code == 202
             assert upload(client, data).status_code == 202
-            assert upload(client, data).status_code == 429
+            assert upload(client, data).status_code == 202
             assert client.delete(f"/api/analyses/{first}").status_code == 202
         finally:
             release.set()
@@ -151,9 +150,25 @@ def test_full_store_lists_reports_and_can_release_one_slot(client):
         job = store.create(f"Saved {i}", "auto")
         job.status = "failed"
     response = upload(client, b"invalid")
-    assert response.status_code == 429
-    assert "ocho" in response.json()["detail"]
+    assert response.status_code == 202
     saved = client.get("/api/analyses").json()
-    assert len(saved) == 8
+    assert len(saved) == 9
     assert client.delete(f"/api/analyses/{saved[0]['id']}").json()["deleted"]
     assert upload(client, b"invalid").status_code == 202
+
+
+def test_web_analyzes_every_source_above_previous_hundred_file_limit(client):
+    from fortran_analyser.engine import analyse_source
+
+    def in_process(source, path, form, timeout, should_cancel=None):
+        return analyse_source(source, path=path, source_form=form)
+
+    data = bundle([(f"p{i}.f90", "program p\nimplicit none\nend\n") for i in range(101)])
+    with patch("fortran_analyser.project._bounded_analysis", side_effect=in_process):
+        response = upload(client, data)
+        assert response.status_code == 202
+        identifier = response.json()["id"]
+        assert wait(client, identifier)["status"] == "completed"
+        report = client.get(f"/api/analyses/{identifier}/report").json()
+        assert report["summary"]["files"] == report["summary"]["ok"] == 101
+        assert len(report["files"]) == 101

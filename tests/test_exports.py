@@ -57,10 +57,9 @@ def test_tar_rejects_traversal_and_links(tmp_path, name, kind):
         extract_sources(buffer.getvalue(), tmp_path)
 
 
-def test_compression_bomb(tmp_path, monkeypatch):
-    monkeypatch.setattr("fortran_analyser.archive.MAX_EXPANDED", 20_000_000)
-    with pytest.raises(ValueError, match="descomprimidos"):
-        extract_sources(gzip.compress(b" " * 20_000_001), tmp_path)
+def test_compressed_source_above_previous_expanded_limit(tmp_path):
+    assert extract_sources(gzip.compress(b" " * 20_000_001), tmp_path) == 1
+    assert (tmp_path / "source.f90").stat().st_size == 20_000_001
 
 
 def test_pdf_api_has_report_signature_and_rejects_unknown_job():

@@ -1,7 +1,8 @@
-"""Bounded streaming extraction. Uploaded archives and decoder output stay on disk."""
+"""Streaming extraction without size quotas. Files stay in a server-owned directory."""
 
 import io
 import re
+import shutil
 import stat
 import tempfile
 import zipfile
@@ -10,25 +11,19 @@ from pathlib import Path, PurePosixPath
 
 from .project import EXCLUDED_DIRS, EXTENSIONS
 
-MAX_UPLOAD = 4 * 1024**3
-MAX_EXPANDED = 8 * 1024**3
-MAX_SOURCE = 2_000_000
-MAX_TOTAL_SOURCES = 20_000_000
-MAX_SOURCES = 100
-EXTRACTION_TIMEOUT = 1800
 _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.I)
 
 
-def _parts(name, seen):
+def _parts(name, seen, *, portable=True):
     raw = name.rstrip("/")
     parts = raw.split("/")
     if (
         not raw
-        or len(raw) > 240
         or "\\" in raw
         or any(ord(c) < 32 for c in raw)
         or any(
-            p in {"", ".", ".."} or ":" in p or p.endswith((".", " ")) or _RESERVED.match(p)
+            p in {"", ".", ".."}
+            or (portable and (":" in p or p.endswith((".", " ")) or _RESERVED.match(p)))
             for p in parts
         )
         or PurePosixPath(raw).is_absolute()
@@ -48,22 +43,17 @@ class _Collector:
         self.expanded = self.sources = self.source_bytes = 0
 
     def member(self, name, size, directory=False):
-        parts = _parts(name, self.seen)
+        is_source = not directory and PurePosixPath(name).suffix.lower() in EXTENSIONS
+        # Portability restrictions apply only to names actually written to disk.
+        # Structural traversal/absolute/duplicate checks still cover every member.
+        parts = _parts(name, self.seen, portable=is_source)
         self.expanded += size
-        if self.expanded > MAX_EXPANDED:
-            raise ValueError("El contenido supera los 8 GiB descomprimidos.")
         if directory or any(p in EXCLUDED_DIRS for p in parts[:-1]):
             return None
         if PurePosixPath(name).suffix.lower() not in EXTENSIONS:
             return None
-        if size > MAX_SOURCE:
-            raise ValueError("Una fuente Fortran supera los 2 MB.")
         self.sources += 1
         self.source_bytes += size
-        if self.sources > MAX_SOURCES:
-            raise ValueError("El archivo supera los 100 archivos Fortran.")
-        if self.source_bytes > MAX_TOTAL_SOURCES:
-            raise ValueError("Las fuentes Fortran superan los 20 MB en total.")
         target = self.destination.joinpath(*parts)
         if not target.resolve().is_relative_to(self.destination.resolve()):
             raise ValueError("Ruta fuera del directorio de trabajo.")
@@ -72,21 +62,14 @@ class _Collector:
     def write(self, target, stream):
         if target is None:
             return
-        content = stream.read(MAX_SOURCE + 1)
-        if len(content) > MAX_SOURCE:
-            raise ValueError("Una fuente Fortran supera los 2 MB.")
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("xb") as output:
-            output.write(content)
+            shutil.copyfileobj(stream, output, length=1024 * 1024)
 
 
 @contextmanager
 def _input(data):
     with io.BytesIO(data) if isinstance(data, bytes) else Path(data).open("rb") as stream:
-        stream.seek(0, 2)
-        if stream.tell() > MAX_UPLOAD:
-            raise ValueError("El archivo comprimido supera los 4 GiB.")
-        stream.seek(0)
         yield stream
 
 
@@ -139,14 +122,7 @@ def extract_sources(data: bytes | Path, destination: Path, filename="source.f90.
                     with tempfile.TemporaryFile(dir=destination.parent) as decoded:
                         if opener:
                             with opener(stream) as compressed:
-                                total = 0
-                                while chunk := compressed.read(1024 * 1024):
-                                    total += len(chunk)
-                                    if total > MAX_EXPANDED:
-                                        raise ValueError(
-                                            "El contenido supera los 8 GiB descomprimidos."
-                                        )
-                                    decoded.write(chunk)
+                                shutil.copyfileobj(compressed, decoded, length=1024 * 1024)
                             decoded.seek(0)
                             source = decoded
                         else:
@@ -205,28 +181,31 @@ def _seven_zip(stream, collector):
             targets[member.filename] = collector.member(
                 member.filename, member.uncompressed, member.is_directory
             )
-        actual = 0
 
-        class Sink(io.BytesIO):
+        class Sink:
             def __init__(self, target):
-                super().__init__()
                 self.target = target
                 self.count = 0
+                self.stream = (
+                    tempfile.TemporaryFile(dir=collector.destination.parent) if target else None
+                )
 
             def write(self, chunk):
-                nonlocal actual
-                actual += len(chunk)
                 self.count += len(chunk)
-                if actual > MAX_EXPANDED:
-                    raise ValueError("El contenido supera los 8 GiB descomprimidos.")
-                if self.target:
-                    if self.count > MAX_SOURCE:
-                        raise ValueError("Una fuente Fortran supera los 2 MB.")
-                    return super().write(chunk)
-                return len(chunk)  # Consume unneeded solid-block members without retaining them.
+                return self.stream.write(chunk) if self.stream else len(chunk)
+
+            def read(self, size=-1):
+                return self.stream.read(size) if self.stream else b""
+
+            def seek(self, offset, whence=0):
+                return self.stream.seek(offset, whence) if self.stream else 0
+
+            def flush(self):
+                if self.stream:
+                    self.stream.flush()
 
             def close(self):
-                pass
+                pass  # py7zr closes its writers before we collect them.
 
             def size(self):
                 return self.count
@@ -241,11 +220,16 @@ def _seven_zip(stream, collector):
                 return sink
 
         factory = Factory()
-        archive.extractall(factory=factory)
-        for sink in factory.streams:
-            if sink.target:
-                sink.seek(0)
-                collector.write(sink.target, sink)
+        try:
+            archive.extractall(factory=factory)
+            for sink in factory.streams:
+                if sink.target:
+                    sink.seek(0)
+                    collector.write(sink.target, sink)
+        finally:
+            for sink in factory.streams:
+                if sink.stream:
+                    sink.stream.close()
 
 
 def _extraction_worker(connection, data, destination, filename):
@@ -257,18 +241,21 @@ def _extraction_worker(connection, data, destination, filename):
         connection.close()
 
 
-def bounded_extract(data, destination, filename):
-    """Terminate decompression after 30 minutes, including malformed native codecs."""
+def bounded_extract(data, destination, filename, should_cancel=None):
+    """Isolate extraction; wait without a deadline, allowing explicit cancellation."""
     import multiprocessing
 
     context = multiprocessing.get_context("spawn")
     receive, send = context.Pipe(duplex=False)
     process = context.Process(target=_extraction_worker, args=(send, data, destination, filename))
     try:
+        if should_cancel and should_cancel():
+            raise ValueError("Descompresión cancelada.")
         process.start()
         send.close()
-        if not receive.poll(EXTRACTION_TIMEOUT):
-            raise ValueError("Descompresión interrumpida: límite de 30 minutos.")
+        while not receive.poll(0.2):
+            if should_cancel and should_cancel():
+                raise ValueError("Descompresión cancelada.")
         try:
             success, result = receive.recv()
         except EOFError:

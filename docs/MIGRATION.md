@@ -153,3 +153,34 @@ Validación: 102 pruebas pasan sobre el paquete instalado en Docker Linux. Recep
 - [x] Verificar extracción con más de 1.000 entradas en los tres formatos y rechazo de rutas inseguras después de ese umbral.
 
 La cantidad de entradas deja de tener una cuota fija. No se promete memoria ni tiempo infinitos: siguen vigentes 4 GiB de subida, 8 GiB expandidos, 30 minutos de extracción, 100 fuentes Fortran, 2 MB por fuente y 20 MB de fuentes en total. La comprobación de duplicados mantiene un índice de rutas en memoria. Los resultados anteriores sobre la barrera de 1.000 entradas corresponden al estado anterior a esta entrega.
+
+
+## Cantidad de fuentes Fortran (2026-11-12)
+
+- [x] Retirar la cuota de 100 fuentes de la extracción y el trabajador web.
+- [x] Desactivar por defecto la cuota de 500 archivos del motor y la consola, conservando límites explícitos opcionales.
+- [x] Actualizar la interfaz y cubrir extracción de más de 100 fuentes, descubrimiento de más de 500 y recorrido web con 101 fuentes sin truncar el informe.
+
+No hay cuota fija de cantidad de entradas ni de fuentes. Se mantienen 4 GiB comprimidos, 8 GiB expandidos, 2 MB por fuente, 20 MB de fuentes en conjunto, 30 minutos de extracción y 5 segundos de análisis por archivo en la web. Las menciones anteriores a 100/500 archivos documentan el estado de entregas previas.
+
+
+Verificación: 106 pruebas pasan en Windows y una prueba dispersa de Linux se omite; Ruff, formato, TypeScript y Vite correctos. Inspección de metadatos del adjunto GEOS-5 (sin extraer ni ejecutar): 1.426 fuentes compatibles, 63.869.724 bytes en conjunto, cuatro mayores de 2.000.000 bytes y máximo de 4.066.970 bytes. La eliminación de la cuota de cantidad no elimina los límites independientes de 20 MB de fuentes ni 2 MB por fuente; ese proyecto todavía los supera.
+
+
+## Retirada de todas las cuotas predeterminadas (2026-11-12)
+
+Por petición explícita del usuario:
+
+- [x] Sin máximo de subida, expansión, fuentes individuales o suma de fuentes.
+- [x] Sin cuota de entradas, cantidad de fuentes, trabajos en cola o informes retenidos/restaurados.
+- [x] Sin duración máxima de carga, extracción o análisis y sin caducidad de cargas por bloques.
+- [x] Sin tope de bytes de bloque en la API; la web usa bloques de 8 MiB como transporte para proxies.
+- [x] Sin truncado de líneas en el visor ni tope de tamaño del registro persistente.
+- [x] Compose sin cuotas explícitas de CPU, RAM o procesos ni tamaño fijo de tmpfs.
+
+Se conservan la validación de rutas, enlaces, archivos especiales, offsets y tamaño final de transferencia, y la cancelación explícita. Los límites opcionales del motor/consola solo se aplican si el llamante los solicita. No hay recursos físicos infinitos ni control de límites de proxies externos desde la aplicación.
+
+Regresión real: GEOS-5 extrae 1.426 fuentes y 63.869.724 bytes, con un máximo individual de 4.066.970 bytes, sin las cuotas anteriores. Su directorio de documentación `About..` no se escribe y ya no provoca un rechazo por portabilidad Windows; las rutas de fuentes materializadas siguen validándose. No se ha ejecutado el modelo ni se afirma que el parser admita todo su dialecto.
+
+
+Verificación final: 111 pruebas pasan en Windows y la prueba dispersa de Linux se omite; 112 pruebas pasan sobre el paquete instalado en Docker Linux. Ruff, formato del frontend, TypeScript/Vite y validación de ambos Compose correctos. Se contrastó la extracción completa del GEOS-5 aportado, sin ejecutar código ni scripts del modelo. Esta entrega sustituye las cuotas descritas en las entregas anteriores del plan.

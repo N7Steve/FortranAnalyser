@@ -149,3 +149,42 @@ def test_cli_directory_output_cannot_overwrite_an_analysed_file(tmp_path):
     )
     assert run.returncode == 2
     assert path.read_text() == original
+
+
+def test_default_file_count_is_unbounded_and_explicit_limit_still_applies(tmp_path, monkeypatch):
+    from fortran_analyser.models import FileResult
+
+    for i in range(501):
+        (tmp_path / f"p{i}.f90").write_text("program p\nend\n")
+    monkeypatch.setattr(
+        "fortran_analyser.project._bounded_analysis",
+        lambda source, path, form, timeout: FileResult(path, "ok", form),
+    )
+    assert analyse_project(tmp_path).summary["files"] == 501
+    with pytest.raises(ValueError, match="límite"):
+        analyse_project(tmp_path, max_files=500)
+
+
+def test_default_analysis_does_not_limit_source_bytes_or_duration(tmp_path, monkeypatch):
+    from fortran_analyser.models import FileResult
+
+    source = "!" + "x" * 2_000_001 + "\nprogram p\nend\n"
+    (tmp_path / "large.f90").write_bytes(source.encode())
+    received = []
+
+    def inspect(text, path, form, timeout):
+        assert text == source
+        assert timeout is None
+        received.append(path)
+        return FileResult(path, "ok", form)
+
+    monkeypatch.setattr("fortran_analyser.project._bounded_analysis", inspect)
+    assert analyse_project(tmp_path).summary["ok"] == 1
+    assert received == ["large.f90"]
+
+
+def test_analysis_without_deadline_can_still_be_cancelled():
+    from fortran_analyser.project import _bounded_analysis
+
+    with pytest.raises(ValueError, match="cancelado"):
+        _bounded_analysis("program p\nend", "p.f90", "free", None, lambda: True)

@@ -1,4 +1,4 @@
-"""Bounded single-worker queue with optional atomic on-disk result records."""
+"""Single-worker queue without admission quotas; optional atomic on-disk results."""
 
 import json
 import logging
@@ -94,8 +94,6 @@ class JobStore:
             if not state.is_file() or state.is_symlink():
                 continue
             try:
-                if state.stat().st_size > 32_000_000:
-                    raise ValueError("Stored record exceeds size limit")
                 payload = json.loads(state.read_text(encoding="utf-8"))
                 saved = payload["job"]
                 if payload["storage_version"] != 1 or saved["id"] != directory.name:
@@ -132,37 +130,14 @@ class JobStore:
                     job.report = None
                     shutil.rmtree(directory)
                     self._save(job)
-                if len(self.jobs) < 8:
-                    self.jobs[job.id] = job
-                else:
-                    logger.warning("Stored analysis %s exceeds the session capacity", job.id)
+                self.jobs[job.id] = job
             except (OSError, ValueError, KeyError, TypeError):
                 logger.warning(
                     "Ignoring unreadable analysis record %s", directory.name, exc_info=True
                 )
 
-    def expire_uploads(self):
-        with self.lock:
-            for job in list(self.jobs.values()):
-                if (
-                    job.chunked
-                    and job.status == "uploading"
-                    and time.monotonic() - job.last_activity > 1800
-                ):
-                    self.delete(job.id)
-
     def create(self, name: str, source_form: str) -> Job:
         with self.lock:
-            self.expire_uploads()
-            if sum(j.status not in TERMINAL for j in self.jobs.values()) >= 3:
-                raise ValueError(
-                    "Hay tres análisis activos. Espera o cancela uno en Análisis del servidor."
-                )
-            if len(self.jobs) >= 8:
-                raise ValueError(
-                    "Se ha alcanzado el límite de ocho análisis guardados. "
-                    "Elimina uno en Análisis del servidor para continuar."
-                )
             job = Job(uuid.uuid4().hex, name, source_form)
             self.jobs[job.id] = job
             return job
@@ -185,7 +160,7 @@ class JobStore:
             with self.lock:
                 job.status = "extracting"
             directory.mkdir(exist_ok=True)
-            total = bounded_extract(data, directory, job.name)
+            total = bounded_extract(data, directory, job.name, job.cancel.is_set)
             with self.lock:
                 job.total = total
                 job.status = "running"
@@ -197,8 +172,6 @@ class JobStore:
             report = analyse_project(
                 directory,
                 source_form=job.source_form,
-                max_files=100,
-                timeout=5,
                 on_progress=progress,
                 should_cancel=job.cancel.is_set,
             )

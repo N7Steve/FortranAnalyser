@@ -13,9 +13,11 @@ def main(argv=None) -> int:
     parser.add_argument("path", type=Path, help="Archivo o directorio local")
     parser.add_argument("--output", "-o", type=Path, help="Guardar JSON UTF-8 en este archivo")
     parser.add_argument("--source-form", choices=["auto", "fixed", "free"], default="auto")
-    parser.add_argument("--max-file-bytes", type=int, default=2_000_000)
-    parser.add_argument("--max-files", type=int, default=500)
-    parser.add_argument("--timeout", type=float, default=10, help="Segundos por archivo")
+    parser.add_argument("--max-file-bytes", type=int, default=None)
+    parser.add_argument("--max-files", type=int, default=None, help="Límite opcional de archivos")
+    parser.add_argument(
+        "--timeout", type=float, default=None, help="Límite opcional de segundos por archivo"
+    )
     args = parser.parse_args(argv)
     try:
         if args.output and args.path.is_file() and args.output.resolve() == args.path.resolve():
