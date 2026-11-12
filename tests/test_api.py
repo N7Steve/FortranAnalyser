@@ -142,3 +142,17 @@ def test_configured_frontend_is_served_without_exposing_sources(tmp_path, monkey
         assert web.get("/").text == "<h1>Compiled application</h1>"
         assert web.get("/api/health").json() == {"status": "ok"}
         assert web.get("/reference/pom.xml").status_code == 404
+
+
+def test_full_store_lists_reports_and_can_release_one_slot(client):
+    store = client.app.state.store
+    for i in range(8):
+        job = store.create(f"Saved {i}", "auto")
+        job.status = "failed"
+    response = upload(client, b"invalid")
+    assert response.status_code == 429
+    assert "ocho" in response.json()["detail"]
+    saved = client.get("/api/analyses").json()
+    assert len(saved) == 8
+    assert client.delete(f"/api/analyses/{saved[0]['id']}").json()["deleted"]
+    assert upload(client, b"invalid").status_code == 202

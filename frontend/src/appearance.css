@@ -1345,3 +1345,48 @@ select,
   min-width: 750px;
   color: var(--ui-text);
 }
+
+.analysis-history {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius);
+}
+.analysis-history summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.analysis-history p {
+  margin: 12px 0;
+}
+.analysis-history ul {
+  padding: 0;
+  list-style: none;
+}
+.analysis-history li {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ui-border);
+}
+.analysis-history li > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.analysis-history li > div {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .analysis-history li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .analysis-history li > div {
+    flex-wrap: wrap;
+  }
+}

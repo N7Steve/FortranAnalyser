@@ -136,11 +136,15 @@ class JobStore:
 
     def create(self, name: str, source_form: str) -> Job:
         with self.lock:
-            if (
-                len(self.jobs) >= 8
-                or sum(j.status not in TERMINAL for j in self.jobs.values()) >= 3
-            ):
-                raise ValueError("Cola llena. Espera o elimina un análisis anterior.")
+            if sum(j.status not in TERMINAL for j in self.jobs.values()) >= 3:
+                raise ValueError(
+                    "Hay tres análisis activos. Espera o cancela uno en Análisis del servidor."
+                )
+            if len(self.jobs) >= 8:
+                raise ValueError(
+                    "Se ha alcanzado el límite de ocho análisis guardados. "
+                    "Elimina uno en Análisis del servidor para continuar."
+                )
             job = Job(uuid.uuid4().hex, name, source_form)
             self.jobs[job.id] = job
             return job

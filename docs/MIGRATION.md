@@ -101,3 +101,12 @@ Al terminar una entrega, marcar lo completado, registrar los límites encontrado
 No se promete cualquier formato existente: RAR, archivos multipartes, cifrados y contenedores anidados no están soportados. Los gzip de una sola fuente necesitan conservar la extensión Fortran en el nombre enviado. El grafo no resuelve despacho dinámico, renombrados USE, genéricos ni llamadas a funciones en expresiones; los destinos externos o ambiguos quedan visibles sin resolver. No se calcula CC a partir del grafo de dependencias. La firma es un sello visual y una huella SHA-256 del JSON canónico, sin certificado digital. La puntuación es una adaptación pequeña y explícita, no una reproducción de las once métricas Java.
 
 Verificación de esta entrega: 88 pruebas Python en Windows y Linux (etapa test de Docker), Ruff, TypeScript y construcción web; PDF de muestra renderizado para revisión visual. Navegador Chromium: tema naranja persistente, ejemplo, descarga PDF y móvil a 390 px sin desbordamiento ni errores JavaScript. El despliegue en el NAS real sigue pendiente. Siguiente paso: contrastar grafos y complejidad con un proyecto científico real, incluyendo sus convenciones de módulos e interfaces.
+
+
+## Recuperación de capacidad del servidor (2026-11-12)
+
+- [x] Distinguir el límite de tres trabajos activos del de ocho análisis guardados.
+- [x] Añadir «Análisis del servidor» para recuperar informes, consultar estados, cancelar trabajos o eliminar análisis terminados, incluso sin la sesión original del navegador.
+- [x] Conservar los informes hasta que el usuario los elimine y actualizar la lista mientras hay trabajos activos.
+
+Regresión cubierta: servidor persistente con ocho registros después de reiniciar, rechazo explícito de una carga, listado y eliminación de un registro para aceptar otra carga. 90 pruebas Python pasan; Ruff, TypeScript y construcción web verificados. El siguiente paso de validación sigue siendo contrastar el motor con un proyecto científico real.

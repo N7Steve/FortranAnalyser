@@ -86,3 +86,29 @@ def test_configurable_nas_hostname_still_rejects_unknown_hosts(monkeypatch):
         assert client.get("/api/health", headers={"Host": "truenas.local:8890"}).status_code == 200
         assert client.get("/api/health", headers={"Host": "192.168.1.20:8890"}).status_code == 200
         assert client.get("/api/health", headers={"Host": "unknown.example"}).status_code == 400
+
+
+def test_full_persistent_store_can_be_managed_after_losing_browser_session(tmp_path):
+    import pytest
+
+    store = JobStore(tmp_path, persistent=True)
+    try:
+        for i in range(8):
+            job = store.create(f"Saved {i}", "auto")
+            job.status = "failed"
+            job.error = "Invalid archive"
+            store._save(job)
+    finally:
+        store.close()
+    restored = JobStore(tmp_path, persistent=True)
+    try:
+        assert len(restored.jobs) == 8
+        with pytest.raises(ValueError, match="ocho análisis guardados"):
+            restored.create("New", "auto")
+        previous = next(iter(restored.jobs))
+        assert restored.delete(previous)
+        assert not (tmp_path / previous).exists()
+        assert restored.create("New", "auto").status == "uploading"
+        assert len(restored.jobs) == 8
+    finally:
+        restored.close()

@@ -97,3 +97,10 @@ Perfil orientativo 0–10: `6 × fracción de ámbitos con IMPLICIT NONE + 2 si 
 Formatos soportados: ZIP, 7z, TAR, TAR.GZ/TGZ, TAR.BZ2/TBZ2, TAR.XZ/TXZ y fuentes individuales `.f90.gz` (también bzip2/xz y otras extensiones Fortran). La detección usa el contenido, no la extensión. Para fuentes individuales, enviar el nombre completo en `name`. No se admiten RAR, cifrados, multipartes ni extracción recursiva de comprimidos internos.
 
 El icono `frontend/public/original-icon.png` procede de `fortranAnalyserIcon.png`, del proyecto original de Michael García Rodríguez, bajo la licencia GPL del repositorio. La copia local `reference/` permanece ignorada y sin cambios.
+
+
+## Mensaje de capacidad y recuperación de informes
+
+«Análisis del servidor» lista los análisis retenidos, aunque se haya borrado la caché o se abra otra pestaña. Permite abrir un informe terminado, ver el estado de otro trabajo, cancelar trabajos activos y eliminar informes y fuentes de trabajos terminados. La lista se actualiza mientras hay trabajos activos y también dispone de un botón de actualización manual.
+
+Se distinguen dos límites: tres trabajos activos (esperar o cancelar uno) y ocho análisis retenidos (eliminar uno terminado). Los informes no se eliminan automáticamente para admitir cargas nuevas. Borrar la caché del navegador o reiniciar un servidor persistente no libera los registros guardados.

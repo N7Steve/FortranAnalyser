@@ -1,3 +1,4 @@
+import AnalysisHistory from './AnalysisHistory'
 import StructureReport from './StructureReport'
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
@@ -426,6 +427,25 @@ export default function App() {
                 accept=".zip,.7z,.tar,.tgz,.tar.gz,.gz,.gzip,.bz2,.tbz2,.xz,.txz"
                 aria-label="Seleccionar proyecto comprimido"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => choose(e.target.files?.[0])}
+              />
+              <AnalysisHistory
+                refreshKey={`${job?.id}:${job?.status}:${busy}:${error}`}
+                onOpen={(previous) => {
+                  setReport(null)
+                  setSelected(null)
+                  setLine(0)
+                  setError('')
+                  setJob(previous)
+                  setTab('overview')
+                }}
+                onRemoved={(id) => {
+                  if (job?.id === id) {
+                    setJob(null)
+                    setReport(null)
+                    setSelected(null)
+                    sessionStorage.removeItem('fortran-analysis')
+                  }
+                }}
               />
               {error && (
                 <div className="error-banner" role="alert">
