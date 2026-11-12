@@ -1,3 +1,4 @@
+import { uploadArchive } from './api'
 import AnalysisHistory from './AnalysisHistory'
 import StructureReport from './StructureReport'
 import { useEffect, useRef, useState } from 'react'
@@ -161,6 +162,15 @@ export default function App() {
   const [form, setForm] = useState('auto')
   const [persistent, setPersistent] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(
+    null,
+  )
+  const uploadController = useRef<AbortController | null>(null)
+  const uploadDialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    if (uploadProgress && !uploadDialog.current?.open) uploadDialog.current?.showModal()
+    if (!uploadProgress) uploadDialog.current?.close()
+  }, [!!uploadProgress])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -226,12 +236,15 @@ export default function App() {
   }, [job?.id, job?.status, !!report])
 
   async function upload(file: Blob, name: string) {
-    if (file.size > 10_000_000) {
-      setError('El archivo debe ocupar como máximo 10 MB.')
+    if (file.size > 4 * 1024 ** 3) {
+      setError('El archivo debe ocupar como máximo 4 GiB.')
       return
     }
     setBusy(true)
     setError('')
+    const controller = new AbortController()
+    uploadController.current = controller
+    if (file.size >= 20 * 1024 ** 2) setUploadProgress({ loaded: 0, total: file.size })
     try {
       if (job) await request(`/api/analyses/${job.id}`, { method: 'DELETE' })
       setJob(null)
@@ -239,18 +252,20 @@ export default function App() {
       setSelected(null)
       setLine(0)
       setTab('overview')
-      const next = await request<Job>(
+      const next = await uploadArchive<Job>(
         `/api/analyses?name=${encodeURIComponent(name)}&source_form=${form}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: file,
+        file,
+        (loaded, total) => {
+          if (file.size >= 20 * 1024 ** 2) setUploadProgress({ loaded, total })
         },
+        controller.signal,
       )
       setJob(next)
     } catch (error) {
       setError((error as Error).message)
     } finally {
+      setUploadProgress(null)
+      uploadController.current = null
       setBusy(false)
       if (input.current) input.current.value = ''
     }
@@ -310,6 +325,39 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <dialog
+        ref={uploadDialog}
+        className="upload-progress-dialog"
+        aria-labelledby="upload-progress-title"
+        onCancel={(event) => {
+          event.preventDefault()
+          uploadController.current?.abort()
+        }}
+      >
+        <h2 id="upload-progress-title">Subiendo proyecto</h2>
+        {uploadProgress && (
+          <>
+            <p role="status">
+              {uploadProgress.loaded >= uploadProgress.total
+                ? 'Transferencia completada. Esperando confirmación del servidor…'
+                : `${Math.floor((uploadProgress.loaded / uploadProgress.total) * 100)} % transferido`}
+            </p>
+            <progress
+              aria-label="Progreso de subida"
+              max={uploadProgress.total}
+              value={uploadProgress.loaded}
+            />
+            <p>
+              {(uploadProgress.loaded / 1024 ** 2).toFixed(1)} /{' '}
+              {(uploadProgress.total / 1024 ** 2).toFixed(1)} MiB
+            </p>
+            <p>Al terminar la subida comenzarán la descompresión y el análisis.</p>
+            <button className="button secondary" onClick={() => uploadController.current?.abort()}>
+              Cancelar subida
+            </button>
+          </>
+        )}
+      </dialog>
       <aside className="sidebar">
         <a className="brand" href="/" aria-label="FortranAnalyser, inicio">
           <span className="brand-mark">
@@ -522,7 +570,7 @@ export default function App() {
                         </select>
                         <ChevronDown size={13} />
                       </label>
-                      <small>Hasta 10 MB · 100 archivos Fortran</small>
+                      <small>Hasta 4 GiB · 100 archivos Fortran</small>
                     </div>
                   </section>
                   <div className="intro-grid">

@@ -110,3 +110,16 @@ Verificación de esta entrega: 88 pruebas Python en Windows y Linux (etapa test 
 - [x] Conservar los informes hasta que el usuario los elimine y actualizar la lista mientras hay trabajos activos.
 
 Regresión cubierta: servidor persistente con ocho registros después de reiniciar, rechazo explícito de una carga, listado y eliminación de un registro para aceptar otra carga. 90 pruebas Python pasan; Ruff, TypeScript y construcción web verificados. El siguiente paso de validación sigue siendo contrastar el motor con un proyecto científico real.
+
+
+## Subida de 4 GiB y progreso (2026-11-12)
+
+- [x] Límite de 4 GiB con comprobación anticipada de Content-Length y comprobación de bytes reales para cargas sin longitud.
+- [x] Recepción en disco, cola por ruta y limpieza al completar, fallar, cancelar o reiniciar.
+- [x] Extracción por streams/temporales de disco, con 8 GiB expandidos y 30 minutos de límite. Se mantienen 100 fuentes, 2 MB por fuente y 20 MB de fuentes en total.
+- [x] Modal desde 20 MiB con porcentaje de transferencia real, MiB enviados, confirmación del servidor y cancelación.
+
+Verificaciones: regresiones de formatos y extracción segura, límites escalados y cabecera de 4 GiB, carga de 32 MiB transferida al trabajador por ruta, limpieza y prueba de archivo ZIP real disperso de exactamente 4 GiB en Linux. La prueba dispersa se omite en Windows para evitar asignar físicamente 4 GiB. Documentados espacio de disco y límites de proxies. El NAS real sigue pendiente de validación.
+
+
+Resultado de verificación: 96 pruebas pasan en Windows y una se omite por requerir archivo disperso Linux; las 97 pasan en Docker Linux. Ruff y compilación TypeScript/Vite pasan. Chromium con red limitada valida progreso parcial real, cancelación y subida posterior de 24 MiB, sin errores JavaScript ni desbordamiento a 390 px. No se ha transferido por HTTP un archivo completo de 4 GiB: el límite exacto se verifica con cabeceras, límites escalados y extracción del ZIP disperso de 4 GiB en disco.

@@ -79,3 +79,8 @@ python scripts/smoke_container.py
 ```
 
 La etapa `test` ejecuta las pruebas Python en Linux, sin añadir sus dependencias a la imagen final. La prueba de contenedor crea un proyecto Compose propio, comprueba web, API, ejemplo, descarga, permisos y recreación con datos conservados. Elimina solo los recursos sintéticos de esa prueba al terminar. Necesita Docker y un puerto libre; admite `--port` para cambiar el de prueba.
+
+
+### Espacio para cargas grandes
+
+La subida máxima es de 4 GiB. Los comprimidos y temporales de descompresión se escriben en el volumen de análisis, no en `/tmp`. Para tres cargas máximas y una expansión TAR de hasta 8 GiB, reservar al menos 20 GiB libres adicionales a los análisis guardados. Si se usa un proxy inverso, aumentar también su límite de cuerpo a 4 GiB y sus tiempos de espera; el Compose no configura proxies externos. Se conserva el límite de memoria del contenedor porque las cargas se procesan por streams de disco.

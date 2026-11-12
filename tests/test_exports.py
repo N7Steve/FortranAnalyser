@@ -57,8 +57,9 @@ def test_tar_rejects_traversal_and_links(tmp_path, name, kind):
         extract_sources(buffer.getvalue(), tmp_path)
 
 
-def test_compression_bomb(tmp_path):
-    with pytest.raises(ValueError, match="20 MB"):
+def test_compression_bomb(tmp_path, monkeypatch):
+    monkeypatch.setattr("fortran_analyser.archive.MAX_EXPANDED", 20_000_000)
+    with pytest.raises(ValueError, match="descomprimidos"):
         extract_sources(gzip.compress(b" " * 20_000_001), tmp_path)
 
 

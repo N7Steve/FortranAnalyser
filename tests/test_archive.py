@@ -84,9 +84,10 @@ def test_invalid_or_empty_source_archive(tmp_path, data):
         extract_sources(data, tmp_path)
 
 
-def test_limits_include_non_source_payloads(tmp_path):
+def test_limits_include_non_source_payloads(tmp_path, monkeypatch):
+    monkeypatch.setattr("fortran_analyser.archive.MAX_EXPANDED", 20_000_000)
     data = bundle([("huge.bin", b" " * 20_000_001), ("p.f90", "")])
-    with pytest.raises(ValueError, match="20 MB"):
+    with pytest.raises(ValueError, match="descomprimidos"):
         extract_sources(data, tmp_path)
 
 

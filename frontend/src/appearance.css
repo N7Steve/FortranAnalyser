@@ -1390,3 +1390,23 @@ select,
     flex-wrap: wrap;
   }
 }
+
+.upload-progress-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 28px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+}
+.upload-progress-dialog::backdrop {
+  background: #0009;
+}
+.upload-progress-dialog progress {
+  width: 100%;
+  height: 24px;
+  accent-color: var(--ui-accent);
+}
+.upload-progress-dialog p {
+  margin: 16px 0;
+}

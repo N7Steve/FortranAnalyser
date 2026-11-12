@@ -75,7 +75,8 @@ def test_bad_zip_becomes_visible_failure_and_cleans_files(client):
     assert client.get(f"/api/analyses/{identifier}/report").status_code == 409
 
 
-def test_upload_limit_and_media_type_release_reserved_slot(client):
+def test_upload_limit_and_media_type_release_reserved_slot(client, monkeypatch):
+    monkeypatch.setattr("fortran_analyser.api.MAX_UPLOAD", 10_000_000)
     assert client.post("/api/analyses", content="text").status_code == 415
     for _ in range(4):
         assert upload(client, b"x" * 10_000_001).status_code == 413

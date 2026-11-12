@@ -103,27 +103,47 @@ def create_app() -> FastAPI:
             "application/x-bzip2",
             "application/x-xz",
         }:
-            raise HTTPException(415, "Envía un archivo ZIP como cuerpo de la petición.")
+            raise HTTPException(415, "Envía un archivo comprimido como cuerpo de la petición.")
+        length = request.headers.get("content-length")
+        if length and length.isdecimal() and int(length) > MAX_UPLOAD:
+            raise HTTPException(413, "El archivo supera los 4 GiB.")
         try:
             job = store(request).create(name, source_form)
         except ValueError as exc:
             raise HTTPException(429, str(exc)) from exc
+        upload_path = store(request).root / f"{job.id}.upload"
+        submitted = False
         try:
-            data = bytearray()
-            async with asyncio.timeout(30):
-                async for chunk in request.stream():
-                    if len(data) + len(chunk) > MAX_UPLOAD:
-                        raise HTTPException(413, "El archivo supera los 10 MB.")
-                    data.extend(chunk)
-            await run_in_threadpool(store(request).submit, job, bytes(data))
+            size = 0
+            with upload_path.open("xb") as output:
+                chunks = request.stream().__aiter__()
+                async with asyncio.timeout(24 * 60 * 60):
+                    while True:
+                        try:
+                            chunk = await asyncio.wait_for(anext(chunks), timeout=120)
+                        except StopAsyncIteration:
+                            break
+                        size += len(chunk)
+                        if size > MAX_UPLOAD:
+                            raise HTTPException(413, "El archivo supera los 4 GiB.")
+                        if job.cancel.is_set():
+                            raise HTTPException(409, "Carga cancelada.")
+                        await run_in_threadpool(output.write, chunk)
+            await run_in_threadpool(store(request).submit, job, upload_path)
+            submitted = True
             with store(request).lock:
                 return job.snapshot()
-        except BaseException as exc:
-            with store(request).lock:
-                store(request).jobs.pop(job.id, None)
-            if isinstance(exc, TimeoutError):
-                raise HTTPException(408, "Tiempo de carga agotado.") from exc
-            raise
+        except TimeoutError as exc:
+            raise HTTPException(408, "Tiempo de carga agotado (120 s sin recibir datos).") from exc
+        except OSError as exc:
+            raise HTTPException(
+                507, "No se pudo guardar la carga. Comprueba el espacio disponible."
+            ) from exc
+        finally:
+            if not submitted:
+                upload_path.unlink(missing_ok=True)
+                with store(request).lock:
+                    store(request).jobs.pop(job.id, None)
 
     @app.get("/api/analyses/{identifier}")
     def status(request: Request, identifier: str):

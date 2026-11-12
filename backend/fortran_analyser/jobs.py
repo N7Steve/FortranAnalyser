@@ -54,6 +54,10 @@ class JobStore:
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="analysis")
         if persistent:
             self._restore()
+        # A single-worker server owns these temporary uploads; none survive a restart.
+        for path in root.glob("*.upload"):
+            if re.fullmatch(r"[0-9a-f]{32}\.upload", path.name) and not path.is_symlink():
+                path.unlink(missing_ok=True)
 
     def _save(self, job: Job):
         if not self.persistent:
@@ -153,13 +157,13 @@ class JobStore:
         with self.lock:
             return self.jobs[identifier]
 
-    def submit(self, job: Job, data: bytes):
+    def submit(self, job: Job, data: bytes | Path):
         with self.lock:
             job.status = "queued"
             self._save(job)
         self.executor.submit(self._run, job, data)
 
-    def _run(self, job: Job, data: bytes):
+    def _run(self, job: Job, data: bytes | Path):
         directory = self.root / job.id
         try:
             if job.cancel.is_set():
@@ -197,6 +201,8 @@ class JobStore:
             with self.lock:
                 job.status, job.error = "failed", "Error interno al procesar el proyecto."
         finally:
+            if isinstance(data, Path):
+                data.unlink(missing_ok=True)
             with self.lock:
                 if job.cancel.is_set():
                     job.status = "cancelled"
@@ -222,3 +228,5 @@ class JobStore:
             for job in self.jobs.values():
                 job.cancel.set()
         self.executor.shutdown(wait=True, cancel_futures=True)
+        for job in self.jobs.values():
+            (self.root / f"{job.id}.upload").unlink(missing_ok=True)
